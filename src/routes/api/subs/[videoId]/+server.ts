@@ -16,5 +16,7 @@ export const GET: RequestHandler = ({ params, request }) => {
 		.get();
 	const abs = toAbsolute(row?.subtitlePath);
 	if (!abs) error(404, 'No subtitles');
-	return serveFile(abs, request, 'text/vtt; charset=utf-8', { cache: 'public, max-age=86400' });
+	// `private` so a shared proxy (e.g. Cloudflare) can't edge-cache an authed
+	// response and serve it without auth. Browser caching still applies.
+	return serveFile(abs, request, 'text/vtt; charset=utf-8', { cache: 'private, max-age=86400' });
 };

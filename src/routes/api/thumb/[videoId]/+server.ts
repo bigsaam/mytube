@@ -17,5 +17,8 @@ export const GET: RequestHandler = ({ params, request }) => {
 	const abs = toAbsolute(row?.thumbnailPath);
 	if (!abs) error(404, 'No thumbnail');
 	const ext = abs.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
-	return serveFile(abs, request, ext, { cache: 'public, max-age=86400' });
+	// `private`, not `public`: behind a shared proxy (e.g. Cloudflare) a public
+	// response could be edge-cached and served without auth. Browser cache still
+	// works, so there's no meaningful perf loss.
+	return serveFile(abs, request, ext, { cache: 'private, max-age=86400' });
 };
