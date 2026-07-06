@@ -33,6 +33,22 @@ export const config = {
 	recommendedFeedEnabled: bool(env.RECOMMENDED_FEED_ENABLED, false),
 	historySyncEnabled: bool(env.HISTORY_SYNC_ENABLED, false),
 
+	// --- Auth ---
+	// Auth turns ON as soon as a master token OR a login password is configured.
+	// With neither set, the app is open (LAN-only mode, the default).
+	authMasterToken: (env.AUTH_TOKEN ?? '').trim() || null,
+	authPassword: (env.AUTH_PASSWORD ?? '').trim() || null,
+	// Optional explicit cookie-signing secret; otherwise persisted in /data.
+	authSecret: (env.AUTH_SECRET ?? '').trim() || null,
+	get authEnabled(): boolean {
+		return !!(this.authMasterToken || this.authPassword);
+	},
+	// Secure-cookie flag: on when serving over HTTPS. Override with AUTH_COOKIE_SECURE.
+	get cookieSecure(): boolean {
+		if (env.AUTH_COOKIE_SECURE != null) return bool(env.AUTH_COOKIE_SECURE, false);
+		return this.origin.startsWith('https://');
+	},
+
 	// yt-dlp / cookies
 	ytdlpPath: env.YTDLP_PATH ?? 'yt-dlp',
 	get cookiesPath() {

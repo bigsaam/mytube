@@ -15,6 +15,13 @@
       "when": 1783369299790,
       "tag": "0001_legal_exodus",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1783370069369,
+      "tag": "0002_dashing_goliath",
+      "breakpoints": true
     }
   ]
 }

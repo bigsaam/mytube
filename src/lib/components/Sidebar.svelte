@@ -4,8 +4,9 @@
 
 	interface Props {
 		counts?: { feed: number; watchLater: number; downloads: number };
+		showLogout?: boolean;
 	}
-	let { counts }: Props = $props();
+	let { counts, showLogout = false }: Props = $props();
 
 	let nav = $derived([
 		{ href: '/feed', label: 'Feed', icon: 'feed', badge: counts?.feed },
@@ -46,7 +47,12 @@
 		{/each}
 	</nav>
 
-	<div class="mt-auto px-3 pt-4 text-xs text-fg-faint">
-		<p>Self-hosted · LAN only</p>
+	<div class="mt-auto flex flex-col gap-2 px-3 pt-4">
+		{#if showLogout}
+			<a href="/logout" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-fg-muted hover:bg-bg-soft hover:text-fg" data-sveltekit-reload>
+				<Icon name="x" size={18} /> Sign out
+			</a>
+		{/if}
+		<p class="px-3 text-xs text-fg-faint">Self-hosted</p>
 	</div>
 </aside>

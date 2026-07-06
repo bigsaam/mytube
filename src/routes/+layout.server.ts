@@ -4,7 +4,7 @@ import { feedItems, videos, downloads } from '$lib/server/db/schema';
 import type { LayoutServerLoad } from './$types';
 
 /** Lightweight counts for the sidebar badges. */
-export const load: LayoutServerLoad = () => {
+export const load: LayoutServerLoad = ({ locals }) => {
 	const feed = db
 		.select({ n: sql<number>`count(*)` })
 		.from(feedItems)
@@ -22,6 +22,7 @@ export const load: LayoutServerLoad = () => {
 		.get();
 
 	return {
+		authEnabled: locals.authEnabled,
 		counts: {
 			feed: feed?.n ?? 0,
 			watchLater: wl?.n ?? 0,

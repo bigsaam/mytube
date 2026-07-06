@@ -1,7 +1,7 @@
 <script lang="ts">
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Icon from '$lib/components/Icon.svelte';
-	import { formatBytes } from '$lib/format';
+	import { formatBytes, formatRelative } from '$lib/format';
 	import { enhance } from '$app/forms';
 	import { page } from '$app/stores';
 	import type { PageData, ActionData } from './$types';
@@ -18,8 +18,11 @@
 	];
 
 	let origin = $derived($page.url.origin);
+	// When auth is on, cross-site bookmarklet requests can't use the cookie, so a
+	// device token must be embedded via ?token=. Left as a placeholder to fill in.
+	let tokenSuffix = $derived(data.authEnabled ? `+'&token=YOUR_TOKEN'` : '');
 	let bookmarklet = $derived(
-		`javascript:(()=>{fetch('${origin}/api/add?url='+encodeURIComponent(location.href)).then(r=>r.json()).then(d=>alert(d.message||('Queued '+(d.queued||0)))).catch(e=>alert('MyTube: '+e))})();`
+		`javascript:(()=>{fetch('${origin}/api/add?url='+encodeURIComponent(location.href)${tokenSuffix}).then(r=>r.json()).then(d=>alert(d.message||('Queued '+(d.queued||0)))).catch(e=>alert('MyTube: '+e))})();`
 	);
 
 	let maxChannelBytes = $derived(Math.max(1, ...data.storage.perChannel.map((c) => c.bytes)));
@@ -181,6 +184,61 @@
 		<span class="text-fg-faint">→</span>
 	</a>
 </div>
+
+<!-- Access & API tokens -->
+{#if data.authEnabled}
+	<section class="card mt-6 p-5">
+		<h2 class="mb-1 text-sm font-semibold uppercase tracking-wide text-fg-muted">Access &amp; API tokens</h2>
+		<p class="mb-4 text-xs text-fg-faint">
+			Issue a revocable bearer token per device (native app, iOS Shortcut, bookmarklet). Send it as
+			<code>Authorization: Bearer &lt;token&gt;</code>. Revoke any time without affecting others.
+		</p>
+
+		{#if form?.newToken}
+			<div class="mb-4 rounded-lg border border-accent/40 bg-accent-soft p-3">
+				<p class="mb-1 text-xs text-accent">New token for “{form.newTokenName}” — copy it now, it won't be shown again:</p>
+				<code class="block break-all rounded bg-bg p-2 text-xs text-fg">{form.newToken}</code>
+			</div>
+		{/if}
+
+		<form method="POST" action="?/createToken" use:enhance class="mb-4 flex gap-2">
+			<input class="input flex-1" name="name" placeholder="Token name (e.g. iPhone, Shortcuts)" />
+			<button class="btn-primary" type="submit">Create token</button>
+		</form>
+
+		{#if data.apiTokens.length}
+			<ul class="divide-y divide-line rounded-lg border border-line">
+				{#each data.apiTokens as t (t.id)}
+					<li class="flex items-center gap-3 p-3 text-sm {t.revoked ? 'opacity-50' : ''}">
+						<code class="text-fg-muted">{t.tokenPrefix}…</code>
+						<span class="font-medium">{t.name}</span>
+						<span class="text-xs text-fg-faint">
+							{t.lastUsedAt ? `used ${formatRelative(t.lastUsedAt)}` : 'never used'}
+						</span>
+						<div class="ml-auto">
+							{#if t.revoked}
+								<span class="chip text-fg-faint">revoked</span>
+							{:else}
+								<form method="POST" action="?/revokeToken" use:enhance>
+									<input type="hidden" name="id" value={t.id} />
+									<button class="btn-ghost px-2 py-1 text-xs text-red-400/80" type="submit">Revoke</button>
+								</form>
+							{/if}
+						</div>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</section>
+{:else}
+	<section class="card mt-6 border border-amber-900/40 p-5">
+		<h2 class="mb-1 text-sm font-semibold uppercase tracking-wide text-amber-400/90">Access &amp; API tokens</h2>
+		<p class="text-sm text-fg-muted">
+			Auth is currently <strong>off</strong> (LAN-only mode). Set <code>AUTH_TOKEN</code> or
+			<code>AUTH_PASSWORD</code> in your environment to enable login + issue API tokens before exposing MyTube publicly.
+		</p>
+	</section>
+{/if}
 
 <!-- Maintenance -->
 <div class="mt-6 grid gap-6 lg:grid-cols-2">

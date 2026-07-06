@@ -4,6 +4,7 @@ import { storageSummary } from '$lib/server/storage';
 import { cleanupAllWatched } from '$lib/server/lifecycle';
 import { getVersion, selfUpdate } from '$lib/server/ytdlp';
 import { authStatus } from '$lib/server/google-auth';
+import { listApiTokens, createApiToken, revokeApiToken } from '$lib/server/auth';
 import { config } from '$lib/server/config';
 import type { PageServerLoad, Actions } from './$types';
 
@@ -18,7 +19,7 @@ const SB_CATEGORIES = [
 	'filler'
 ];
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ locals }) => {
 	const ytdlpVersion = await getVersion().catch(() => null);
 	return {
 		settings: getSettings(),
@@ -26,6 +27,8 @@ export const load: PageServerLoad = async () => {
 		ytdlpVersion,
 		sbCategories: SB_CATEGORIES,
 		youtube: authStatus(),
+		authEnabled: locals.authEnabled,
+		apiTokens: locals.authEnabled ? listApiTokens() : [],
 		flags: {
 			recommendedFeedEnabled: config.recommendedFeedEnabled,
 			historySyncEnabled: config.historySyncEnabled
@@ -74,5 +77,22 @@ export const actions: Actions = {
 	cleanupNow: async () => {
 		const pruned = cleanupAllWatched();
 		return { cleaned: pruned };
+	},
+
+	createToken: async ({ request, locals }) => {
+		if (!locals.authEnabled) return fail(400, { error: 'Auth is disabled.' });
+		const form = await request.formData();
+		const name = String(form.get('name') ?? '').trim() || 'device';
+		const { token, row } = createApiToken(name);
+		// Plaintext is returned exactly once, for the user to copy now.
+		return { newToken: token, newTokenName: row.name };
+	},
+
+	revokeToken: async ({ request, locals }) => {
+		if (!locals.authEnabled) return fail(400, { error: 'Auth is disabled.' });
+		const form = await request.formData();
+		const id = Number(form.get('id'));
+		if (Number.isFinite(id)) revokeApiToken(id);
+		return { revoked: true };
 	}
 };

@@ -221,6 +221,20 @@ export const watchProgress = sqliteTable('watch_progress', {
 	updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull().default(now)
 });
 
+/* ---------------------------------------------------------------- api_tokens */
+// Revocable bearer tokens for programmatic clients (native app, iOS Shortcuts,
+// bookmarklet). Only the SHA-256 hash is stored — the plaintext is shown once
+// at creation. The env master token (AUTH_TOKEN) is separate and not stored here.
+export const apiTokens = sqliteTable('api_tokens', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	name: text('name').notNull(),
+	tokenHash: text('token_hash').notNull().unique(),
+	tokenPrefix: text('token_prefix').notNull(), // e.g. "mt_ab12cd" for display
+	revoked: integer('revoked', { mode: 'boolean' }).notNull().default(false),
+	createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().default(now),
+	lastUsedAt: integer('last_used_at', { mode: 'timestamp_ms' })
+});
+
 /* ------------------------------------------------------------------ settings */
 // Simple typed key/value store. Values are JSON-encoded text.
 export const settings = sqliteTable('settings', {
@@ -250,3 +264,4 @@ export type Download = typeof downloads.$inferSelect;
 export type Job = typeof jobs.$inferSelect;
 export type WatchProgress = typeof watchProgress.$inferSelect;
 export type Setting = typeof settings.$inferSelect;
+export type ApiToken = typeof apiTokens.$inferSelect;

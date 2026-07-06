@@ -1,14 +1,21 @@
 <script lang="ts">
 	import '../app.css';
+	import { page } from '$app/stores';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import QuickAdd from '$lib/components/QuickAdd.svelte';
 	import type { LayoutData } from './$types';
 
 	let { children, data }: { children: import('svelte').Snippet; data: LayoutData } = $props();
+
+	// The login page renders without the app chrome.
+	let bare = $derived($page.url.pathname === '/login');
 </script>
 
+{#if bare}
+	{@render children()}
+{:else}
 <div class="flex h-screen overflow-hidden">
-	<Sidebar counts={data.counts} />
+	<Sidebar counts={data.counts} showLogout={data.authEnabled} />
 
 	<div class="flex min-w-0 flex-1 flex-col">
 		<header
@@ -22,3 +29,4 @@
 		</main>
 	</div>
 </div>
+{/if}
