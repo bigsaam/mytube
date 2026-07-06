@@ -221,6 +221,8 @@ export interface DownloadOptions {
 	maxHeight: number;
 	preferH264: boolean;
 	subLangs?: string;
+	/** Categories to physically cut from the file (yt-dlp --sponsorblock-remove). */
+	sponsorblockRemove?: string[];
 	onProgress?: (p: DownloadProgress) => void;
 	signal?: AbortSignal;
 }
@@ -251,6 +253,9 @@ export async function downloadVideo(opts: DownloadOptions): Promise<DownloadResu
 		'--fragment-retries', '10',
 		'--progress-template',
 		'download:HAYPROG|%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s',
+		...(opts.sponsorblockRemove?.length
+			? ['--sponsorblock-remove', opts.sponsorblockRemove.join(',')]
+			: []),
 		...cookieArgs()
 	];
 

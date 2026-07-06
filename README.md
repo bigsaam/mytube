@@ -131,6 +131,41 @@ Create a Shortcut: **Get Current URL from Safari → URL-encode → Get Contents
 `http://HOST:3000/api/add?url=[encoded]` (Method: GET). Add to the Share Sheet to
 fling videos in from anywhere on iOS.
 
+## YouTube playlist sync — the phone loop
+
+The headline workflow: **add a video to a playlist on your phone → MyTube grabs
+it → you watch it here → it's removed from the playlist.** No app needed on the
+phone; just the normal YouTube Save button.
+
+Because YouTube's built-in **Watch Later** is not reachable by any API (Google
+deprecated that in 2016), MyTube syncs a **normal playlist you create** — e.g.
+"MyTube Queue" — via the official **YouTube Data API v3** (robust, no scraping).
+
+### One-time setup
+
+1. In [Google Cloud Console](https://console.cloud.google.com/apis/credentials):
+   create a project → enable **YouTube Data API v3** → create an **OAuth client
+   ID** (type: *Web application*) → add the redirect URI shown on the MyTube page
+   (`<ORIGIN>/api/google/callback`).
+2. In MyTube → **Settings → YouTube playlist sync**: paste the client ID/secret,
+   click **Connect YouTube account**, approve, then pick your queue playlist.
+
+> Make sure `ORIGIN` in `.env` matches how you reach MyTube — the OAuth redirect
+> URI is built from it and must match Google exactly.
+
+### The loop
+
+- MyTube polls the playlist ~every 5 min; new videos download and land in
+  **Watch Later**. (Thumbnails, chapters, description all populate.)
+- Watch here — **sponsor/intro/outro segments are cut from the file on download**
+  by default (yt-dlp `--sponsorblock-remove`; switch to in-player skipping in
+  Settings), and there are no ads (it's a local file).
+- At ≥90% watched, MyTube calls `playlistItems.delete` to remove it from the
+  playlist. Failures retry and never block local playback.
+
+OAuth client secret + refresh token live in a `0600` file under `/data`, never
+in the DB and never sent to the browser.
+
 ## Recommended feed (optional)
 
 Off by default. Two independent, cookie-authenticated integrations, each behind

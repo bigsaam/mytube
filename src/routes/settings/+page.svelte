@@ -125,8 +125,15 @@
 				<label class="mb-2 flex items-center gap-3 text-sm">
 					<input type="checkbox" name="sponsorblockEnabled" checked={s.sponsorblockEnabled} class="accent-accent" /> Fetch segments on download
 				</label>
+				<label class="mb-3 flex items-center justify-between gap-4 text-sm">
+					<span>When downloading</span>
+					<select name="sponsorblockMode" class="input w-56">
+						<option value="remove" selected={s.sponsorblockMode === 'remove'}>Cut segments from the file</option>
+						<option value="skip" selected={s.sponsorblockMode === 'skip'}>Keep file, skip in player</option>
+					</select>
+				</label>
 				<label class="mb-3 flex items-center gap-3 text-sm">
-					<input type="checkbox" name="sponsorblockAutoSkip" checked={s.sponsorblockAutoSkip} class="accent-accent" /> Auto-skip by default in the player
+					<input type="checkbox" name="sponsorblockAutoSkip" checked={s.sponsorblockAutoSkip} class="accent-accent" /> Auto-skip by default in the player (skip mode)
 				</label>
 				<div class="flex flex-wrap gap-x-4 gap-y-2">
 					{#each data.sbCategories as cat (cat)}
@@ -156,6 +163,23 @@
 			</div>
 		</div>
 	</form>
+</div>
+
+<!-- YouTube playlist sync -->
+<div class="mt-6">
+	<a href="/settings/youtube" class="card flex items-center gap-4 p-5 hover:bg-bg-hover">
+		<div class="grid h-10 w-10 place-items-center rounded-full bg-bg-raised text-fg-muted">
+			<Icon name="watch-later" size={20} />
+		</div>
+		<div class="flex-1">
+			<h2 class="text-sm font-semibold">YouTube playlist sync</h2>
+			<p class="text-xs text-fg-muted">
+				Add videos to a playlist on your phone → auto-download → auto-remove when watched.
+				{#if data.youtube.connected}<span class="text-accent"> · Connected</span>{:else}<span class="text-fg-faint"> · Not connected</span>{/if}
+			</p>
+		</div>
+		<span class="text-fg-faint">→</span>
+	</a>
 </div>
 
 <!-- Maintenance -->

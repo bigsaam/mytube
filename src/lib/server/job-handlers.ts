@@ -3,6 +3,7 @@ import { pollChannel, fillFeedItemDuration, expireOldFeedItems } from './feed';
 import { runCleanupSweep, setWatchedHook } from './lifecycle';
 import { runRecommendedScrape } from './recommended-scraper';
 import { enqueueHistorySync, runHistorySync } from './history-sync';
+import { syncPlaylist, removeFromPlaylist, enqueuePlaylistRemove } from './playlist-sync';
 
 /**
  * Wires job types to their handlers + registers cross-module hooks. Called once
@@ -38,6 +39,19 @@ export function registerJobHandlers(): void {
 		if (videoId) await runHistorySync(videoId);
 	});
 
-	// When a video is marked watched, (optionally) sync it to YouTube history.
-	setWatchedHook(enqueueHistorySync);
+	registerJobHandler('playlist_sync', async () => {
+		await syncPlaylist();
+	});
+
+	registerJobHandler('playlist_remove', async (payload) => {
+		const videoId = String(payload.videoId ?? '');
+		if (videoId) await removeFromPlaylist(videoId);
+	});
+
+	// When a video is marked watched: (optionally) ping YouTube history AND
+	// remove it from the synced playlist. Both self-gate on their flags.
+	setWatchedHook((videoId) => {
+		enqueueHistorySync(videoId);
+		enqueuePlaylistRemove(videoId);
+	});
 }

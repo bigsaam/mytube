@@ -5,6 +5,7 @@ import { channels, jobs } from './db/schema';
 import { enqueueJob } from './jobs';
 import { getSetting } from './settings';
 import { config } from './config';
+import { playlistSyncActive } from './playlist-sync';
 
 /**
  * Periodic scheduling. Called from the worker loop (~once a minute). Decides
@@ -47,6 +48,24 @@ export function scheduleRecommended(): void {
 	const jitter = 1 + (Math.random() - 0.5) * 0.4; // ±20%
 	const due = !last || Date.now() - last.createdAt.getTime() >= intervalMs * jitter;
 	if (due) enqueueJob('recommended_scrape', {}, { dedupeKey: 'recommended_scrape' });
+}
+
+/**
+ * Poll the synced YouTube playlist frequently (every ~5 min) so a video added
+ * on your phone shows up in MyTube quickly — this is the P0 responsiveness path.
+ */
+const PLAYLIST_SYNC_INTERVAL_MS = 5 * 60_000;
+export function schedulePlaylistSync(): void {
+	if (!playlistSyncActive()) return;
+	const last = db
+		.select({ createdAt: jobs.createdAt })
+		.from(jobs)
+		.where(eq(jobs.type, 'playlist_sync'))
+		.orderBy(desc(jobs.createdAt))
+		.limit(1)
+		.get();
+	const due = !last || Date.now() - last.createdAt.getTime() >= PLAYLIST_SYNC_INTERVAL_MS;
+	if (due) enqueueJob('playlist_sync', {}, { dedupeKey: 'playlist_sync' });
 }
 
 let lastMaintenance = 0;

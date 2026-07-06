@@ -3,6 +3,7 @@ import { getSettings, updateSettings, type AppSettings } from '$lib/server/setti
 import { storageSummary } from '$lib/server/storage';
 import { cleanupAllWatched } from '$lib/server/lifecycle';
 import { getVersion, selfUpdate } from '$lib/server/ytdlp';
+import { authStatus } from '$lib/server/google-auth';
 import { config } from '$lib/server/config';
 import type { PageServerLoad, Actions } from './$types';
 
@@ -24,6 +25,7 @@ export const load: PageServerLoad = async () => {
 		storage: storageSummary(),
 		ytdlpVersion,
 		sbCategories: SB_CATEGORIES,
+		youtube: authStatus(),
 		flags: {
 			recommendedFeedEnabled: config.recommendedFeedEnabled,
 			historySyncEnabled: config.historySyncEnabled
@@ -51,6 +53,7 @@ export const actions: Actions = {
 			autoMarkWatchedPercent: Math.min(100, Math.max(50, num(form, 'autoMarkWatchedPercent', cur.autoMarkWatchedPercent))),
 			sponsorblockEnabled: bool(form, 'sponsorblockEnabled'),
 			sponsorblockAutoSkip: bool(form, 'sponsorblockAutoSkip'),
+			sponsorblockMode: form.get('sponsorblockMode') === 'skip' ? 'skip' : 'remove',
 			sponsorblockCategories: SB_CATEGORIES.filter((c) => form.get(`sb_${c}`) != null),
 			rssPollIntervalMin: Math.max(5, num(form, 'rssPollIntervalMin', cur.rssPollIntervalMin)),
 			feedItemExpiryDays: Math.max(0, num(form, 'feedItemExpiryDays', cur.feedItemExpiryDays))

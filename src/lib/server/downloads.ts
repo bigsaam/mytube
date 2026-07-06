@@ -35,6 +35,9 @@ export interface EnqueueOptions {
 	addToWatchLater?: boolean;
 	maxHeight?: number | null;
 	priority?: number;
+	// Linkage back to a synced YouTube playlist (for remove-on-watched).
+	sourcePlaylistId?: string | null;
+	playlistItemId?: string | null;
 }
 
 export interface EnqueueResult {
@@ -60,7 +63,9 @@ export function enqueueDownload(opts: EnqueueOptions): EnqueueResult {
 				durationSeconds: opts.durationSeconds ?? null,
 				status: 'pending',
 				inWatchLater: !!opts.addToWatchLater,
-				watchLaterOrder: opts.addToWatchLater ? nextWatchLaterOrder() : null
+				watchLaterOrder: opts.addToWatchLater ? nextWatchLaterOrder() : null,
+				sourcePlaylistId: opts.sourcePlaylistId ?? null,
+				playlistItemId: opts.playlistItemId ?? null
 			})
 			.run();
 	} else {
@@ -68,6 +73,11 @@ export function enqueueDownload(opts: EnqueueOptions): EnqueueResult {
 		if (opts.addToWatchLater && !existing.inWatchLater) {
 			patch.inWatchLater = true;
 			patch.watchLaterOrder = nextWatchLaterOrder();
+		}
+		// Record/refresh the playlist linkage so remove-on-watched can fire.
+		if (opts.playlistItemId && existing.playlistItemId !== opts.playlistItemId) {
+			patch.sourcePlaylistId = opts.sourcePlaylistId ?? existing.sourcePlaylistId;
+			patch.playlistItemId = opts.playlistItemId;
 		}
 		if (opts.title && existing.title === existing.videoId) patch.title = opts.title;
 		if (Object.keys(patch).length) {
@@ -180,6 +190,12 @@ async function process(id: number): Promise<void> {
 			.run();
 
 		// 2) Download into /media/{slug}/{video_id}/video.*
+		// When SponsorBlock mode is 'remove', cut the configured categories from
+		// the file itself (ffmpeg); the player then has nothing to skip.
+		const cutCategories =
+			settings.sponsorblockEnabled && settings.sponsorblockMode === 'remove'
+				? settings.sponsorblockCategories
+				: undefined;
 		const targetDir = videoDirAbs(p.channelName, channelId, dl.videoId);
 		let lastWrittenPct = -1;
 		const result = await downloadVideo({
@@ -187,6 +203,7 @@ async function process(id: number): Promise<void> {
 			targetDir,
 			maxHeight: dl.maxHeight ?? settings.defaultMaxHeight,
 			preferH264: settings.preferH264,
+			sponsorblockRemove: cutCategories,
 			onProgress: (prog) => {
 				if (Math.abs(prog.percent - lastWrittenPct) < 0.005 && prog.stage === dl.stage) return;
 				lastWrittenPct = prog.percent;
@@ -203,10 +220,12 @@ async function process(id: number): Promise<void> {
 			throw new YtDlpError('download finished but no video file was produced', '', 0);
 		}
 
-		// 3) SponsorBlock (best-effort).
-		const sponsorblock = settings.sponsorblockEnabled
-			? await fetchSponsorSegments(dl.videoId, settings.sponsorblockCategories)
-			: [];
+		// 3) SponsorBlock segments for the player — only when we DIDN'T cut them
+		// from the file (cutting shifts timestamps, making skip data invalid).
+		const sponsorblock =
+			settings.sponsorblockEnabled && settings.sponsorblockMode === 'skip'
+				? await fetchSponsorSegments(dl.videoId, settings.sponsorblockCategories)
+				: [];
 
 		// 4) Persist the finished library row.
 		db.update(videos)

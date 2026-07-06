@@ -112,6 +112,11 @@ export const videos = sqliteTable(
 		historySyncOptout: integer('history_sync_optout', { mode: 'boolean' })
 			.notNull()
 			.default(false),
+		// Origin of this download, when it came from a synced YouTube playlist.
+		// `playlistItemId` is the Data API id we DELETE to remove it from the
+		// playlist once watched (null = not sourced from a synced playlist).
+		sourcePlaylistId: text('source_playlist_id'),
+		playlistItemId: text('playlist_item_id'),
 
 		addedAt: integer('added_at', { mode: 'timestamp_ms' }).notNull().default(now),
 		downloadedAt: integer('downloaded_at', { mode: 'timestamp_ms' })
@@ -181,7 +186,9 @@ export const jobs = sqliteTable(
 				'recommended_scrape',
 				'history_sync',
 				'cleanup',
-				'expire_feed'
+				'expire_feed',
+				'playlist_sync',
+				'playlist_remove'
 			]
 		}).notNull(),
 		payload: text('payload', { mode: 'json' }).$type<Record<string, unknown>>(),

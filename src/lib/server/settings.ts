@@ -21,6 +21,16 @@ export interface AppSettings {
 	sponsorblockEnabled: boolean;
 	sponsorblockAutoSkip: boolean;
 	sponsorblockCategories: string[];
+	// 'remove' physically cuts segments at download (needs ffmpeg); 'skip'
+	// keeps the file intact and skips client-side in the player.
+	sponsorblockMode: 'skip' | 'remove';
+
+	// YouTube playlist sync (Data API). Reads a dedicated playlist, auto-grabs
+	// new items, and removes them once watched. Secrets/tokens live in a file
+	// (see google-auth.ts) — never in settings — so they can't reach the client.
+	playlistSyncEnabled: boolean;
+	syncPlaylistId: string | null;
+	syncPlaylistTitle: string | null;
 
 	// Feed / scheduler
 	rssPollIntervalMin: number;
@@ -54,6 +64,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
 	sponsorblockEnabled: true,
 	sponsorblockAutoSkip: true,
 	sponsorblockCategories: ['sponsor', 'selfpromo', 'interaction', 'intro', 'outro', 'music_offtopic'],
+	sponsorblockMode: 'remove',
+
+	playlistSyncEnabled: false,
+	syncPlaylistId: null,
+	syncPlaylistTitle: null,
 
 	rssPollIntervalMin: config.rssPollIntervalMin,
 	feedItemExpiryDays: config.feedItemExpiryDays,

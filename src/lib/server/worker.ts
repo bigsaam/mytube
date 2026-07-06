@@ -1,7 +1,12 @@
 import { resetStuckDownloads, tick as downloadsTick } from './downloads';
 import { resetStuckJobs, tick as jobsTick } from './jobs';
 import { registerJobHandlers } from './job-handlers';
-import { scheduleDuePolls, scheduleMaintenance, scheduleRecommended } from './scheduler';
+import {
+	scheduleDuePolls,
+	scheduleMaintenance,
+	scheduleRecommended,
+	schedulePlaylistSync
+} from './scheduler';
 
 /**
  * Background worker orchestration. Started once at boot from bootstrap.ts.
@@ -36,6 +41,7 @@ export function startWorkers() {
 		safeInterval(
 			() => {
 				scheduleDuePolls();
+				schedulePlaylistSync();
 				scheduleRecommended();
 				scheduleMaintenance();
 			},
