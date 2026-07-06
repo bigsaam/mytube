@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatDuration, formatBytes, timestampToSeconds } from './format';
+import { formatDuration, formatBytes, timestampToSeconds, parseDescription } from './format';
 
 describe('formatDuration', () => {
 	it('formats mm:ss and h:mm:ss', () => {
@@ -31,5 +31,20 @@ describe('timestampToSeconds', () => {
 	});
 	it('rejects garbage', () => {
 		expect(timestampToSeconds('abc')).toBeNull();
+	});
+});
+
+describe('parseDescription', () => {
+	it('splits timestamps from text', () => {
+		const parts = parseDescription('Intro 0:00 then 1:23 the good part');
+		expect(parts.filter((p) => p.seconds !== null).map((p) => p.seconds)).toEqual([0, 83]);
+		expect(parts.map((p) => p.text).join('')).toBe('Intro 0:00 then 1:23 the good part');
+	});
+	it('handles h:mm:ss', () => {
+		const parts = parseDescription('chapter at 1:02:03 here');
+		expect(parts.find((p) => p.seconds !== null)?.seconds).toBe(3723);
+	});
+	it('returns [] for empty', () => {
+		expect(parseDescription('')).toEqual([]);
 	});
 });

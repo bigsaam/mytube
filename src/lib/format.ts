@@ -47,3 +47,24 @@ export function timestampToSeconds(ts: string): number | null {
 	if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
 	return null;
 }
+
+export type DescPart = { text: string; seconds: number | null };
+
+/**
+ * Split a description into plain-text and clickable-timestamp parts. A run is a
+ * timestamp only if it looks like m:ss or h:mm:ss on a token boundary.
+ */
+export function parseDescription(text: string): DescPart[] {
+	if (!text) return [];
+	const re = /\b(\d{1,2}:\d{2}(?::\d{2})?)\b/g;
+	const parts: DescPart[] = [];
+	let last = 0;
+	let m: RegExpExecArray | null;
+	while ((m = re.exec(text))) {
+		if (m.index > last) parts.push({ text: text.slice(last, m.index), seconds: null });
+		parts.push({ text: m[1], seconds: timestampToSeconds(m[1]) });
+		last = m.index + m[1].length;
+	}
+	if (last < text.length) parts.push({ text: text.slice(last), seconds: null });
+	return parts;
+}
