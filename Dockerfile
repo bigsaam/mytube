@@ -9,9 +9,11 @@
 ##########################################################################
 
 ARG NODE_VERSION=22-bookworm-slim
-# Pin yt-dlp; extractor breakage is the #1 failure mode. The Settings page has a
-# "self-update yt-dlp" button (yt-dlp -U) to move ahead of this baseline.
-ARG YTDLP_VERSION=2024.11.18
+# Pin yt-dlp; extractor breakage is the #1 failure mode. Keep this current with
+# the latest stable — a stale pin fails on YouTube's current player. The Settings
+# page has a "self-update yt-dlp" button (yt-dlp -U) to move ahead of this
+# baseline without rebuilding, and `--build-arg YTDLP_VERSION=<tag>` overrides it.
+ARG YTDLP_VERSION=2026.07.04
 
 ############################### deps / build ##############################
 FROM node:${NODE_VERSION} AS build
