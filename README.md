@@ -141,10 +141,10 @@ Phase 6 lands.
 ## Build phases
 
 1. **Scaffold + schema** ✅ — SvelteKit + Drizzle + Docker; core tables; sidebar shell.
-2. **Download pipeline + player** — yt-dlp wrapper, queue + worker, range streaming.
-3. **Full player** — progress, chapters, SponsorBlock, subs, shortcuts.
-4. **Channels + feed** — RSS polling, feed actions, Takeout import.
-5. **Lifecycle + polish** — watched auto-mark, cleanup, storage, SSE downloads.
+2. **Download pipeline + player** ✅ — yt-dlp wrapper, queue + worker, range streaming.
+3. **Full player** ✅ — progress, chapters, SponsorBlock, subs, shortcuts.
+4. **Channels + feed** ✅ — RSS polling, feed actions, Takeout import.
+5. **Lifecycle + polish** ✅ — watched auto-mark, cleanup, storage, SSE downloads.
 6. **Recommended feed + history sync** — Playwright module, cookies, `--mark-watched`.
 
 ## Non-goals (v1)

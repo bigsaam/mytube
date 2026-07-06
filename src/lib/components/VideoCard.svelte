@@ -29,10 +29,9 @@
 
 	let link = $derived(href ?? `/watch/${videoId}`);
 	let duration = $derived(formatDuration(durationSeconds));
-	let playable = $derived(status == null || status === 'ready');
 </script>
 
-<a href={playable ? link : undefined} class="group block" class:pointer-events-none={!playable}>
+<a href={link} class="group block">
 	<div class="relative aspect-video overflow-hidden rounded-xl bg-bg-raised">
 		{#if thumbnailUrl}
 			<img

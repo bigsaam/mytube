@@ -1,7 +1,183 @@
 <script lang="ts">
 	import PageHeader from '$lib/components/PageHeader.svelte';
-	import EmptyState from '$lib/components/EmptyState.svelte';
+	import Icon from '$lib/components/Icon.svelte';
+	import { formatBytes } from '$lib/format';
+	import { enhance } from '$app/forms';
+	import { page } from '$app/stores';
+	import type { PageData, ActionData } from './$types';
+
+	let { data, form }: { data: PageData; form: ActionData } = $props();
+	let s = $derived(data.settings);
+	let updatingYtdlp = $state(false);
+
+	const HEIGHTS = [360, 480, 720, 1080, 1440, 2160];
+	const POLICIES = [
+		{ v: 'keep_forever', label: 'Keep forever' },
+		{ v: 'delete_after_days', label: 'Delete watched after N days' },
+		{ v: 'delete_immediately', label: 'Delete immediately when watched' }
+	];
+
+	let origin = $derived($page.url.origin);
+	let bookmarklet = $derived(
+		`javascript:(()=>{fetch('${origin}/api/add?url='+encodeURIComponent(location.href)).then(r=>r.json()).then(d=>alert(d.message||('Queued '+(d.queued||0)))).catch(e=>alert('Haystack: '+e))})();`
+	);
+
+	let maxChannelBytes = $derived(Math.max(1, ...data.storage.perChannel.map((c) => c.bytes)));
 </script>
 
 <PageHeader title="Settings" subtitle="Quality, cleanup, feeds, and integrations" />
-<EmptyState icon="settings" title="Settings coming online" hint="Download quality, cleanup policy, and the recommended-feed module land in later build phases." />
+
+{#if form?.saved}<p class="mb-4 rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">Settings saved.</p>{/if}
+{#if form?.cleaned != null}<p class="mb-4 rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">Cleaned up {form.cleaned} watched video(s).</p>{/if}
+{#if form?.ytdlpUpdated}<p class="mb-4 rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">yt-dlp updated to {form.version}.</p>{/if}
+{#if form?.error}<p class="mb-4 rounded-md bg-red-950 px-3 py-2 text-sm text-red-300">{form.error}</p>{/if}
+
+<div class="grid gap-6 lg:grid-cols-3">
+	<!-- Storage dashboard -->
+	<section class="card p-5 lg:col-span-1">
+		<h2 class="mb-4 text-sm font-semibold uppercase tracking-wide text-fg-muted">Storage</h2>
+		<div class="mb-4">
+			<div class="text-3xl font-semibold">{formatBytes(data.storage.totalBytes)}</div>
+			<div class="text-sm text-fg-muted">{data.storage.videoCount} videos on disk</div>
+		</div>
+
+		<div class="mb-4 rounded-lg bg-bg p-3">
+			<div class="flex items-center justify-between text-sm">
+				<span class="text-fg-muted">Reclaimable (watched, unpinned)</span>
+				<span class="font-medium">{formatBytes(data.storage.watchedReclaimableBytes)}</span>
+			</div>
+			<form method="POST" action="?/cleanupNow" use:enhance class="mt-2">
+				<button class="btn-ghost w-full text-sm" type="submit" disabled={data.storage.watchedReclaimableCount === 0}>
+					<Icon name="trash" size={15} /> Clean up {data.storage.watchedReclaimableCount} watched now
+				</button>
+			</form>
+		</div>
+
+		{#if data.storage.perChannel.length}
+			<h3 class="mb-2 text-xs font-medium text-fg-muted">By channel</h3>
+			<ul class="flex flex-col gap-2">
+				{#each data.storage.perChannel.slice(0, 8) as c (c.channelId ?? c.channelName)}
+					<li>
+						<div class="flex justify-between text-xs">
+							<span class="truncate text-fg">{c.channelName ?? 'Unknown'}</span>
+							<span class="tabular-nums text-fg-muted">{formatBytes(c.bytes)}</span>
+						</div>
+						<div class="mt-1 h-1.5 rounded-full bg-bg-raised">
+							<div class="h-full rounded-full bg-accent/70" style="width:{(c.bytes / maxChannelBytes) * 100}%"></div>
+						</div>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</section>
+
+	<!-- Main settings form -->
+	<form method="POST" action="?/save" use:enhance class="lg:col-span-2">
+		<div class="flex flex-col gap-6">
+			<!-- Downloads -->
+			<section class="card p-5">
+				<h2 class="mb-4 text-sm font-semibold uppercase tracking-wide text-fg-muted">Downloads</h2>
+				<label class="mb-3 flex items-center justify-between gap-4">
+					<span class="text-sm">Max resolution</span>
+					<select name="defaultMaxHeight" class="input w-40">
+						{#each HEIGHTS as h (h)}<option value={h} selected={s.defaultMaxHeight === h}>{h}p</option>{/each}
+					</select>
+				</label>
+				<label class="flex items-center gap-3 text-sm">
+					<input type="checkbox" name="preferH264" checked={s.preferH264} class="accent-accent" />
+					Prefer H.264/AAC (best browser compatibility, no transcoding)
+				</label>
+			</section>
+
+			<!-- Watched & cleanup -->
+			<section class="card p-5">
+				<h2 class="mb-4 text-sm font-semibold uppercase tracking-wide text-fg-muted">Watched &amp; cleanup</h2>
+				<label class="mb-3 flex items-center justify-between gap-4">
+					<span class="text-sm">Auto-mark watched at</span>
+					<span class="flex items-center gap-2">
+						<input type="number" name="autoMarkWatchedPercent" min="50" max="100" value={s.autoMarkWatchedPercent} class="input w-20" />
+						<span class="text-sm text-fg-muted">%</span>
+					</span>
+				</label>
+				<label class="mb-3 flex items-center justify-between gap-4">
+					<span class="text-sm">Cleanup policy</span>
+					<select name="cleanupPolicy" class="input w-64">
+						{#each POLICIES as p (p.v)}<option value={p.v} selected={s.cleanupPolicy === p.v}>{p.label}</option>{/each}
+					</select>
+				</label>
+				<label class="flex items-center justify-between gap-4">
+					<span class="text-sm">Keep watched for (days)</span>
+					<input type="number" name="cleanupKeepDays" min="1" value={s.cleanupKeepDays} class="input w-20" />
+				</label>
+				<p class="mt-2 text-xs text-fg-faint">Pinned videos are always exempt. Deleting files keeps the history record; the video can be re-grabbed.</p>
+			</section>
+
+			<!-- SponsorBlock -->
+			<section class="card p-5">
+				<h2 class="mb-4 text-sm font-semibold uppercase tracking-wide text-fg-muted">SponsorBlock</h2>
+				<label class="mb-2 flex items-center gap-3 text-sm">
+					<input type="checkbox" name="sponsorblockEnabled" checked={s.sponsorblockEnabled} class="accent-accent" /> Fetch segments on download
+				</label>
+				<label class="mb-3 flex items-center gap-3 text-sm">
+					<input type="checkbox" name="sponsorblockAutoSkip" checked={s.sponsorblockAutoSkip} class="accent-accent" /> Auto-skip by default in the player
+				</label>
+				<div class="flex flex-wrap gap-x-4 gap-y-2">
+					{#each data.sbCategories as cat (cat)}
+						<label class="flex items-center gap-2 text-xs capitalize">
+							<input type="checkbox" name={`sb_${cat}`} checked={s.sponsorblockCategories.includes(cat)} class="accent-accent" />
+							{cat.replace('_', ' ')}
+						</label>
+					{/each}
+				</div>
+			</section>
+
+			<!-- Feed -->
+			<section class="card p-5">
+				<h2 class="mb-4 text-sm font-semibold uppercase tracking-wide text-fg-muted">Feed &amp; scheduler</h2>
+				<label class="mb-3 flex items-center justify-between gap-4">
+					<span class="text-sm">RSS poll interval (minutes)</span>
+					<input type="number" name="rssPollIntervalMin" min="5" value={s.rssPollIntervalMin} class="input w-24" />
+				</label>
+				<label class="flex items-center justify-between gap-4">
+					<span class="text-sm">Feed items expire after (days, 0 = never)</span>
+					<input type="number" name="feedItemExpiryDays" min="0" value={s.feedItemExpiryDays} class="input w-24" />
+				</label>
+			</section>
+
+			<div class="flex justify-end">
+				<button class="btn-primary" type="submit">Save settings</button>
+			</div>
+		</div>
+	</form>
+</div>
+
+<!-- Maintenance -->
+<div class="mt-6 grid gap-6 lg:grid-cols-2">
+	<section class="card p-5">
+		<h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-fg-muted">yt-dlp</h2>
+		<p class="mb-3 text-sm text-fg-muted">
+			Version: <span class="font-mono text-fg">{data.ytdlpVersion ?? 'not found'}</span>
+		</p>
+		<p class="mb-3 text-xs text-fg-faint">Extractor breakage is the #1 failure mode — update when downloads start failing.</p>
+		<form method="POST" action="?/updateYtdlp" use:enhance={() => { updatingYtdlp = true; return async ({ update }) => { await update(); updatingYtdlp = false; }; }}>
+			<button class="btn-ghost" type="submit" disabled={updatingYtdlp}>
+				<Icon name="retry" size={15} /> {updatingYtdlp ? 'Updating…' : 'Update yt-dlp (yt-dlp -U)'}
+			</button>
+		</form>
+	</section>
+
+	<section class="card p-5">
+		<h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-fg-muted">Bookmarklet</h2>
+		<p class="mb-3 text-xs text-fg-faint">Drag this to your bookmarks bar, then click it on any YouTube page to grab the video.</p>
+		<a href={bookmarklet} class="btn-accent" onclick={(e) => e.preventDefault()}>▶ Grab to Haystack</a>
+		<textarea readonly class="input mt-3 h-24 w-full font-mono text-[11px]" onclick={(e) => e.currentTarget.select()}>{bookmarklet}</textarea>
+	</section>
+
+	{#if data.flags.recommendedFeedEnabled || data.flags.historySyncEnabled}
+		<section class="card p-5 lg:col-span-2">
+			<h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-fg-muted">Recommended feed &amp; history sync</h2>
+			<p class="text-sm text-fg-muted">These integrations are configured on the dedicated page.</p>
+			<a href="/settings/recommended" class="btn-ghost mt-3">Open recommended-feed settings →</a>
+		</section>
+	{/if}
+</div>

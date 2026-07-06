@@ -2,12 +2,13 @@
 	import '../app.css';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import QuickAdd from '$lib/components/QuickAdd.svelte';
+	import type { LayoutData } from './$types';
 
-	let { children } = $props();
+	let { children, data }: { children: import('svelte').Snippet; data: LayoutData } = $props();
 </script>
 
 <div class="flex h-screen overflow-hidden">
-	<Sidebar />
+	<Sidebar counts={data.counts} />
 
 	<div class="flex min-w-0 flex-1 flex-col">
 		<header

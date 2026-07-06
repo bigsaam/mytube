@@ -24,13 +24,23 @@
 <svelte:head><title>{data.video.title} · Haystack</title></svelte:head>
 
 {#if !data.playable}
-	<EmptyState
-		icon="downloads"
-		title="Not ready to play yet"
-		hint={data.video.status === 'failed'
-			? 'This download failed — check the Downloads page to retry.'
-			: 'This video is still downloading.'}
-	/>
+	<div class="mx-auto max-w-2xl">
+		{#if data.video.cleaned}
+			<EmptyState icon="trash" title="Files were cleaned up" hint="The history record is kept — you can re-download it." />
+			<form method="POST" action="?/regrab" use:enhance={refresh} class="mt-4 flex justify-center">
+				<input type="hidden" name="videoId" value={data.video.videoId} />
+				<button class="btn-accent" type="submit"><Icon name="grab" size={16} /> Re-download</button>
+			</form>
+		{:else}
+			<EmptyState
+				icon="downloads"
+				title="Not ready to play yet"
+				hint={data.video.status === 'failed'
+					? 'This download failed — check the Downloads page to retry.'
+					: 'This video is still downloading — check back shortly.'}
+			/>
+		{/if}
+	</div>
 {:else}
 	<div class="mx-auto {theater ? 'max-w-none' : 'max-w-5xl'}">
 		<Player

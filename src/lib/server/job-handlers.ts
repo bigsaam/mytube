@@ -1,5 +1,6 @@
 import { registerJobHandler, pruneJobs } from './jobs';
 import { pollChannel, fillFeedItemDuration, expireOldFeedItems } from './feed';
+import { runCleanupSweep } from './lifecycle';
 
 /**
  * Wires job types to their handlers. Called once at worker startup. Kept
@@ -22,5 +23,9 @@ export function registerJobHandlers(): void {
 		pruneJobs();
 	});
 
-	// 'cleanup' registered in Phase 5; 'recommended_scrape' / 'history_sync' in Phase 6.
+	registerJobHandler('cleanup', async () => {
+		runCleanupSweep();
+	});
+
+	// 'recommended_scrape' / 'history_sync' registered in Phase 6.
 }

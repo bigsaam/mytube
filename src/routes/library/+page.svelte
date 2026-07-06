@@ -41,7 +41,7 @@
 				thumbnailUrl={v.status === 'ready' && !v.filesDeleted ? `/api/thumb/${v.videoId}` : null}
 				watched={v.watched}
 				progress={v.progress}
-				status={v.status}
+				status={v.filesDeleted ? 'cleaned' : v.status}
 			/>
 		{/each}
 	</div>

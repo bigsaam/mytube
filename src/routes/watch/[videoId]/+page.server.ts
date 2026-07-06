@@ -4,6 +4,7 @@ import { db } from '$lib/server/db';
 import { videos } from '$lib/server/db/schema';
 import { getVideo } from '$lib/server/library';
 import { markWatched, markUnwatched } from '$lib/server/lifecycle';
+import { enqueueDownload } from '$lib/server/downloads';
 import { getSetting } from '$lib/server/settings';
 import { isVideoId } from '$lib/server/slug';
 import type { PageServerLoad, Actions } from './$types';
@@ -28,7 +29,10 @@ export const load: PageServerLoad = ({ params }) => {
 	};
 
 	if (video.status !== 'ready' || video.filesDeleted) {
-		return { playable: false as const, video: { ...common, status: video.status } };
+		return {
+			playable: false as const,
+			video: { ...common, status: video.status, cleaned: video.filesDeleted }
+		};
 	}
 	return {
 		playable: true as const,
@@ -94,6 +98,23 @@ export const actions: Actions = {
 		const videoId = id(form);
 		const optout = form.get('optout') === '1';
 		db.update(videos).set({ historySyncOptout: optout }).where(eq(videos.videoId, videoId)).run();
+		return { ok: true };
+	},
+
+	regrab: async ({ request }) => {
+		const form = await request.formData();
+		const videoId = id(form);
+		const row = db.select().from(videos).where(eq(videos.videoId, videoId)).get();
+		if (row) {
+			enqueueDownload({
+				videoId,
+				title: row.title,
+				channelId: row.channelId,
+				channelName: row.channelName,
+				durationSeconds: row.durationSeconds
+			});
+			db.update(videos).set({ status: 'pending', filesDeleted: false }).where(eq(videos.videoId, videoId)).run();
+		}
 		return { ok: true };
 	}
 };

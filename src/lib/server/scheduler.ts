@@ -30,6 +30,7 @@ export function scheduleMaintenance(): void {
 	if (now - lastMaintenance < 60 * 60_000) return;
 	lastMaintenance = now;
 	enqueueJob('expire_feed', {}, { dedupeKey: 'expire_feed' });
+	enqueueJob('cleanup', {}, { dedupeKey: 'cleanup' });
 }
 
 // Stable per-id jitter in [0,1) without Math.random (reproducible).

@@ -2,14 +2,19 @@
 	import { page } from '$app/stores';
 	import Icon from './Icon.svelte';
 
-	const nav = [
-		{ href: '/feed', label: 'Feed', icon: 'feed' },
-		{ href: '/watch-later', label: 'Watch Later', icon: 'watch-later' },
-		{ href: '/library', label: 'Library', icon: 'library' },
-		{ href: '/channels', label: 'Channels', icon: 'channels' },
-		{ href: '/downloads', label: 'Downloads', icon: 'downloads' },
-		{ href: '/settings', label: 'Settings', icon: 'settings' }
-	];
+	interface Props {
+		counts?: { feed: number; watchLater: number; downloads: number };
+	}
+	let { counts }: Props = $props();
+
+	let nav = $derived([
+		{ href: '/feed', label: 'Feed', icon: 'feed', badge: counts?.feed },
+		{ href: '/watch-later', label: 'Watch Later', icon: 'watch-later', badge: counts?.watchLater },
+		{ href: '/library', label: 'Library', icon: 'library', badge: 0 },
+		{ href: '/channels', label: 'Channels', icon: 'channels', badge: 0 },
+		{ href: '/downloads', label: 'Downloads', icon: 'downloads', badge: counts?.downloads },
+		{ href: '/settings', label: 'Settings', icon: 'settings', badge: 0 }
+	]);
 
 	function active(href: string): boolean {
 		const p = $page.url.pathname;
@@ -33,7 +38,10 @@
 					{active(item.href) ? 'bg-bg-raised font-medium text-fg' : 'text-fg-muted hover:bg-bg-soft hover:text-fg'}"
 			>
 				<Icon name={item.icon} size={18} />
-				{item.label}
+				<span class="flex-1">{item.label}</span>
+				{#if item.badge && item.badge > 0}
+					<span class="rounded-full bg-bg-hover px-1.5 py-0.5 text-xs tabular-nums text-fg-muted">{item.badge}</span>
+				{/if}
 			</a>
 		{/each}
 	</nav>

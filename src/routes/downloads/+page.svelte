@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { invalidateAll } from '$app/navigation';
 	import { enhance } from '$app/forms';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
@@ -8,17 +7,20 @@
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+	// Live-updated via SSE; seeded from the SSR snapshot.
+	let downloads = $state(data.downloads);
 
-	let active = $derived(
-		data.downloads.filter((d) => d.status === 'active' || d.status === 'queued')
-	);
-
-	// Phase 2: poll while work is in flight. Phase 5 swaps this for SSE.
+	// Live download progress over SSE (no polling).
 	onMount(() => {
-		const t = setInterval(() => {
-			if (active.length > 0) invalidateAll();
-		}, 2000);
-		return () => clearInterval(t);
+		const es = new EventSource('/api/downloads/events');
+		es.onmessage = (e) => {
+			try {
+				downloads = JSON.parse(e.data);
+			} catch {
+				/* ignore malformed frame */
+			}
+		};
+		return () => es.close();
 	});
 
 	const statusColor: Record<string, string> = {
@@ -32,11 +34,11 @@
 
 <PageHeader title="Downloads" subtitle="Queued, active, and failed jobs" />
 
-{#if data.downloads.length === 0}
+{#if downloads.length === 0}
 	<EmptyState icon="downloads" title="No downloads" hint="Grab a video to see live progress here." />
 {:else}
 	<div class="flex flex-col gap-2">
-		{#each data.downloads as d (d.id)}
+		{#each downloads as d (d.id)}
 			<div class="card flex items-center gap-4 p-4">
 				<div class="min-w-0 flex-1">
 					<div class="flex items-center gap-2">
