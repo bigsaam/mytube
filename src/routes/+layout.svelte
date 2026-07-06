@@ -6,6 +6,10 @@
 	let { children } = $props();
 </script>
 
+<svelte:head>
+	<title>Haystack</title>
+</svelte:head>
+
 <div class="flex h-screen overflow-hidden">
 	<Sidebar />
 

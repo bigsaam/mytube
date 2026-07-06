@@ -97,15 +97,39 @@ Behavior split in two:
 
 ## Quick-add & bookmarklet
 
-Fling any YouTube URL in from anywhere:
+Fling any YouTube URL in from anywhere. The endpoint queues a download and
+(optionally) adds to Watch Later.
 
-```
-POST /api/add   { "url": "https://youtu.be/…" }        # JSON body
-POST /api/add?url=https://youtu.be/…                    # or querystring
+```bash
+# JSON body
+curl -X POST http://HOST:3000/api/add \
+  -H 'content-type: application/json' \
+  -d '{"url":"https://youtu.be/dQw4w9WgXcQ","addToWatchLater":true}'
+
+# Querystring (handy for shortcuts / GET)
+curl 'http://HOST:3000/api/add?url=https://youtu.be/dQw4w9WgXcQ&watchLater=1'
 ```
 
-_(Documented fully once Phase 2 lands — the endpoint queues a download and can
-add to Watch Later.)_
+Responses:
+
+- **Single video** → `{ "queued": 1, "videoId": "…", "message": "…" }`
+- **Playlist link** → `{ "requiresConfirmation": true, "count": N, "entries": [...] }`.
+  Confirm by POSTing `{ "videoIds": ["…", "…"] }` (the top-bar box does this for you).
+
+### Bookmarklet
+
+Drag a bookmark with this URL (replace `HOST`), then click it on any YouTube
+watch page to grab the video:
+
+```js
+javascript:(()=>{fetch('http://HOST:3000/api/add?url='+encodeURIComponent(location.href)).then(r=>r.json()).then(d=>alert(d.message||('Queued '+(d.queued||0)))).catch(e=>alert('Haystack: '+e))})();
+```
+
+### iOS Shortcut
+
+Create a Shortcut: **Get Current URL from Safari → URL-encode → Get Contents of**
+`http://HOST:3000/api/add?url=[encoded]` (Method: GET). Add to the Share Sheet to
+fling videos in from anywhere on iOS.
 
 ## Recommended feed (optional)
 
