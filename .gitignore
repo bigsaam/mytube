@@ -1,0 +1,19 @@
+node_modules
+/build
+/.svelte-kit
+/package
+.env
+.env.*
+!.env.example
+vite.config.ts.timestamp-*
+vite.config.js.timestamp-*
+
+# Local runtime data — never commit media or the DB
+/data
+/media
+*.db
+*.db-shm
+*.db-wal
+
+# Playwright browser profile
+/data/browser-profile

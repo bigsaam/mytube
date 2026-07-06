@@ -1,0 +1,30 @@
+services:
+  haystack:
+    build:
+      context: .
+      # Default build has NO browser. To enable the recommended-feed module,
+      # set target: runtime-chromium and RECOMMENDED_FEED_ENABLED=true.
+      target: runtime
+    image: haystack:latest
+    container_name: haystack
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./data:/data # SQLite DB, config, cookies, browser profile
+      - ./media:/media # downloaded videos, thumbnails, subtitles
+    environment:
+      PORT: 3000
+      ORIGIN: ${ORIGIN:-http://localhost:3000}
+      DEFAULT_MAX_HEIGHT: ${DEFAULT_MAX_HEIGHT:-1080}
+      MAX_CONCURRENT_DOWNLOADS: ${MAX_CONCURRENT_DOWNLOADS:-2}
+      RSS_POLL_INTERVAL_MIN: ${RSS_POLL_INTERVAL_MIN:-30}
+      FEED_ITEM_EXPIRY_DAYS: ${FEED_ITEM_EXPIRY_DAYS:-30}
+      RECOMMENDED_FEED_ENABLED: ${RECOMMENDED_FEED_ENABLED:-false}
+      HISTORY_SYNC_ENABLED: ${HISTORY_SYNC_ENABLED:-false}
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
