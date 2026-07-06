@@ -93,6 +93,23 @@
 							<Icon name="pin" size={16} />
 						</button>
 					</form>
+
+					<!-- History-sync opt-out (only when the integration is enabled) -->
+					{#if data.historySyncEnabled}
+						<form method="POST" action="?/historyOptout" use:enhance={refresh}>
+							<input type="hidden" name="videoId" value={data.video.videoId} />
+							<input type="hidden" name="optout" value={data.video.historySyncOptout ? '0' : '1'} />
+							<button
+								class="btn-ghost text-xs {data.video.historySyncOptout ? 'text-accent' : ''}"
+								type="submit"
+								title={data.video.historySyncOptout
+									? 'History sync off for this video — click to re-enable'
+									: 'Mark watched locally only (no YouTube history ping)'}
+							>
+								{data.video.historySyncOptout ? 'Local-only' : 'Syncs to YT'}
+							</button>
+						</form>
+					{/if}
 				</div>
 			</div>
 

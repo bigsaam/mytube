@@ -32,6 +32,13 @@
 {#if form?.ytdlpUpdated}<p class="mb-4 rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">yt-dlp updated to {form.version}.</p>{/if}
 {#if form?.error}<p class="mb-4 rounded-md bg-red-950 px-3 py-2 text-sm text-red-300">{form.error}</p>{/if}
 
+{#if (data.flags.recommendedFeedEnabled || data.flags.historySyncEnabled) && s.recommendedStatus === 'needs_attention'}
+	<a href="/settings/recommended" class="mb-4 flex items-center gap-3 rounded-lg bg-amber-950 px-4 py-3 text-sm text-amber-300 hover:bg-amber-900">
+		<Icon name="warning" size={18} />
+		<span>Recommended feed needs attention{#if s.recommendedMessage} — {s.recommendedMessage}{/if}. Click to fix →</span>
+	</a>
+{/if}
+
 <div class="grid gap-6 lg:grid-cols-3">
 	<!-- Storage dashboard -->
 	<section class="card p-5 lg:col-span-1">

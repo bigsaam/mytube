@@ -133,10 +133,40 @@ fling videos in from anywhere on iOS.
 
 ## Recommended feed (optional)
 
-Off by default. Requires the Chromium image and a `cookies.txt` uploaded via
-Settings. Polls your logged-in homepage 2–4×/day, parses `ytInitialData`
-(no DOM scraping), and drops results into the same feed. Fully documented once
-Phase 6 lands.
+Off by default. Two independent, cookie-authenticated integrations, each behind
+a flag. When the flags are off, no browser is installed or launched and nothing
+writes back to YouTube.
+
+### 1. Recommended feed — `RECOMMENDED_FEED_ENABLED=true`
+
+Scrapes your own logged-in YouTube homepage with Playwright (Chromium):
+
+1. Build the browser image: `docker build --target runtime-chromium -t haystack:chromium .`
+   (or set `target: runtime-chromium` in compose). Chromium adds ~450 MB.
+2. Export `cookies.txt` with the **Get cookies.txt LOCALLY** extension while
+   logged into YouTube, and upload it under **Settings → Recommended feed**.
+
+It seeds a **persistent** browser profile (`/data/browser-profile`) from those
+cookies, polls 2–4×/day (jittered, one session, images/media/fonts blocked),
+pulls `ytInitialData` + `/youtubei/v1/browse` continuations (no DOM scraping),
+and drops normalized items into the same feed with `source=recommended`
+(deduped against subscriptions + the library; Shorts/mixes/live filtered by
+default). All JSON parsing is isolated in `src/lib/server/recommended.ts` with
+fixture tests. On a consent wall / captcha / logged-out page it **pauses and
+shows a “needs attention” banner** in Settings rather than retrying.
+
+The same `cookies.txt` is passed to yt-dlp (`--cookies`) so members-only /
+age-gated videos download too.
+
+### 2. Watch-history write-back — `HISTORY_SYNC_ENABLED=true`
+
+When you mark a video watched, Haystack tells YouTube it was watched so your
+recommendations keep learning. It shells out to
+`yt-dlp --simulate --skip-download --mark-watched --cookies <file> <url>`
+(yt-dlp pings the real `videostats` tracking URLs). Jobs are jittered
+(1–15 min), retried twice, and failures never block the local watched flow.
+Per-video opt-out (“local-only”) lives in the player’s action row. Dismissing a
+feed item never syncs anything.
 
 ## Build phases
 
@@ -145,7 +175,7 @@ Phase 6 lands.
 3. **Full player** ✅ — progress, chapters, SponsorBlock, subs, shortcuts.
 4. **Channels + feed** ✅ — RSS polling, feed actions, Takeout import.
 5. **Lifecycle + polish** ✅ — watched auto-mark, cleanup, storage, SSE downloads.
-6. **Recommended feed + history sync** — Playwright module, cookies, `--mark-watched`.
+6. **Recommended feed + history sync** ✅ — Playwright module, cookies, `--mark-watched`.
 
 ## Non-goals (v1)
 

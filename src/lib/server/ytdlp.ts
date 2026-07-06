@@ -332,6 +332,19 @@ export async function selfUpdate(): Promise<string> {
 	return getVersion();
 }
 
+/**
+ * Tell YouTube a video was watched. yt-dlp fetches the player response and
+ * pings the `videostats` playback/watchtime URLs exactly like the real player —
+ * far more durable than hand-rolling InnerTube calls. Requires cookies.
+ */
+export async function markWatchedRemote(url: string): Promise<void> {
+	if (!fs.existsSync(config.cookiesPath)) throw new Error('history sync requires cookies.txt');
+	await run(
+		['--simulate', '--skip-download', '--mark-watched', '--no-warnings', ...cookieArgs(), url],
+		{ timeoutMs: 60_000 }
+	);
+}
+
 /* ---------------------------------------------------------------- helpers */
 
 function parseUploadDate(d: string | undefined): Date | null {

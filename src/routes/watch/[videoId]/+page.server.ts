@@ -6,6 +6,7 @@ import { getVideo } from '$lib/server/library';
 import { markWatched, markUnwatched } from '$lib/server/lifecycle';
 import { enqueueDownload } from '$lib/server/downloads';
 import { getSetting } from '$lib/server/settings';
+import { config } from '$lib/server/config';
 import { isVideoId } from '$lib/server/slug';
 import type { PageServerLoad, Actions } from './$types';
 
@@ -37,6 +38,7 @@ export const load: PageServerLoad = ({ params }) => {
 	return {
 		playable: true as const,
 		autoSkipDefault: getSetting('sponsorblockAutoSkip'),
+		historySyncEnabled: config.historySyncEnabled,
 		video: {
 			...common,
 			hasSubtitles: !!video.subtitlePath,

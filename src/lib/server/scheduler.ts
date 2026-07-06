@@ -1,7 +1,10 @@
+import fs from 'node:fs';
+import { desc, eq } from 'drizzle-orm';
 import { db } from './db';
-import { channels } from './db/schema';
+import { channels, jobs } from './db/schema';
 import { enqueueJob } from './jobs';
 import { getSetting } from './settings';
+import { config } from './config';
 
 /**
  * Periodic scheduling. Called from the worker loop (~once a minute). Decides
@@ -21,6 +24,29 @@ export function scheduleDuePolls(): void {
 			enqueueJob('rss_poll', { channelId: c.id }, { dedupeKey: `rss:${c.id}` });
 		}
 	}
+}
+
+/**
+ * Schedule recommended-feed scrapes 2–4×/day (jittered). Gated on the feature
+ * flag + presence of cookies. Uses the last recommended_scrape job's timestamp
+ * so it survives restarts without re-scraping on every boot.
+ */
+export function scheduleRecommended(): void {
+	if (!config.recommendedFeedEnabled) return;
+	if (!fs.existsSync(config.cookiesPath)) return;
+
+	const perDay = Math.min(4, Math.max(2, getSetting('recommendedPollsPerDay')));
+	const intervalMs = (24 * 60 * 60_000) / perDay;
+	const last = db
+		.select({ createdAt: jobs.createdAt })
+		.from(jobs)
+		.where(eq(jobs.type, 'recommended_scrape'))
+		.orderBy(desc(jobs.createdAt))
+		.limit(1)
+		.get();
+	const jitter = 1 + (Math.random() - 0.5) * 0.4; // ±20%
+	const due = !last || Date.now() - last.createdAt.getTime() >= intervalMs * jitter;
+	if (due) enqueueJob('recommended_scrape', {}, { dedupeKey: 'recommended_scrape' });
 }
 
 let lastMaintenance = 0;
