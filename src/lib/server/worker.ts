@@ -12,8 +12,8 @@ import { scheduleDuePolls, scheduleMaintenance, scheduleRecommended } from './sc
  *   - scheduler       (slow)   — decide which channels are due to poll
  */
 const globalForWorker = globalThis as unknown as {
-	__haystackWorkers?: boolean;
-	__haystackTimers?: NodeJS.Timeout[];
+	__mytubeWorkers?: boolean;
+	__mytubeTimers?: NodeJS.Timeout[];
 };
 
 const DOWNLOAD_TICK_MS = 2000;
@@ -21,8 +21,8 @@ const JOB_TICK_MS = 2000;
 const SCHEDULER_TICK_MS = 60_000;
 
 export function startWorkers() {
-	if (globalForWorker.__haystackWorkers) return;
-	globalForWorker.__haystackWorkers = true;
+	if (globalForWorker.__mytubeWorkers) return;
+	globalForWorker.__mytubeWorkers = true;
 
 	// Recover from an unclean shutdown before pulling new work.
 	resetStuckDownloads();
@@ -43,7 +43,7 @@ export function startWorkers() {
 			'scheduler'
 		)
 	);
-	globalForWorker.__haystackTimers = timers;
+	globalForWorker.__mytubeTimers = timers;
 
 	// Kick a scheduler pass shortly after boot so fresh installs poll promptly.
 	setTimeout(() => {

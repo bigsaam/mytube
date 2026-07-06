@@ -1,4 +1,4 @@
-# Haystack
+# MyTube
 
 A self-hosted personal YouTube frontend for your homelab. Videos you care about
 are downloaded locally with **yt-dlp** and watched through a clean, fast,
@@ -122,7 +122,7 @@ Drag a bookmark with this URL (replace `HOST`), then click it on any YouTube
 watch page to grab the video:
 
 ```js
-javascript:(()=>{fetch('http://HOST:3000/api/add?url='+encodeURIComponent(location.href)).then(r=>r.json()).then(d=>alert(d.message||('Queued '+(d.queued||0)))).catch(e=>alert('Haystack: '+e))})();
+javascript:(()=>{fetch('http://HOST:3000/api/add?url='+encodeURIComponent(location.href)).then(r=>r.json()).then(d=>alert(d.message||('Queued '+(d.queued||0)))).catch(e=>alert('MyTube: '+e))})();
 ```
 
 ### iOS Shortcut
@@ -141,7 +141,7 @@ writes back to YouTube.
 
 Scrapes your own logged-in YouTube homepage with Playwright (Chromium):
 
-1. Build the browser image: `docker build --target runtime-chromium -t haystack:chromium .`
+1. Build the browser image: `docker build --target runtime-chromium -t mytube:chromium .`
    (or set `target: runtime-chromium` in compose). Chromium adds ~450 MB.
 2. Export `cookies.txt` with the **Get cookies.txt LOCALLY** extension while
    logged into YouTube, and upload it under **Settings → Recommended feed**.
@@ -160,7 +160,7 @@ age-gated videos download too.
 
 ### 2. Watch-history write-back — `HISTORY_SYNC_ENABLED=true`
 
-When you mark a video watched, Haystack tells YouTube it was watched so your
+When you mark a video watched, MyTube tells YouTube it was watched so your
 recommendations keep learning. It shells out to
 `yt-dlp --simulate --skip-download --mark-watched --cookies <file> <url>`
 (yt-dlp pings the real `videostats` tracking URLs). Jobs are jittered

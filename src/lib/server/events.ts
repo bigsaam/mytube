@@ -31,7 +31,7 @@ class Bus extends EventEmitter {
 	}
 }
 
-const globalForBus = globalThis as unknown as { __haystackBus?: Bus };
-export const bus = globalForBus.__haystackBus ?? new Bus();
+const globalForBus = globalThis as unknown as { __mytubeBus?: Bus };
+export const bus = globalForBus.__mytubeBus ?? new Bus();
 bus.setMaxListeners(100);
-if (import.meta.env?.DEV) globalForBus.__haystackBus = bus;
+if (import.meta.env?.DEV) globalForBus.__mytubeBus = bus;

@@ -27,7 +27,7 @@
 		<div class="grid h-8 w-8 place-items-center rounded-lg bg-accent text-bg">
 			<Icon name="play" size={18} />
 		</div>
-		<span class="text-lg font-semibold tracking-tight">Haystack</span>
+		<span class="text-lg font-semibold tracking-tight">MyTube</span>
 	</a>
 
 	<nav class="flex flex-col gap-1">

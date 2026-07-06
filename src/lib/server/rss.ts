@@ -55,7 +55,7 @@ export function parseFeed(xml: string): ParsedFeed {
 export async function fetchChannelFeed(channelId: string): Promise<ParsedFeed> {
 	const url = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(channelId)}`;
 	const res = await fetch(url, {
-		headers: { 'user-agent': 'Mozilla/5.0 Haystack/1.0', accept: 'application/atom+xml' },
+		headers: { 'user-agent': 'Mozilla/5.0 MyTube/1.0', accept: 'application/atom+xml' },
 		signal: AbortSignal.timeout(20_000)
 	});
 	if (res.status === 404) throw new Error(`channel ${channelId} not found (404)`);

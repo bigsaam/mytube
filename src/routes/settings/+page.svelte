@@ -19,7 +19,7 @@
 
 	let origin = $derived($page.url.origin);
 	let bookmarklet = $derived(
-		`javascript:(()=>{fetch('${origin}/api/add?url='+encodeURIComponent(location.href)).then(r=>r.json()).then(d=>alert(d.message||('Queued '+(d.queued||0)))).catch(e=>alert('Haystack: '+e))})();`
+		`javascript:(()=>{fetch('${origin}/api/add?url='+encodeURIComponent(location.href)).then(r=>r.json()).then(d=>alert(d.message||('Queued '+(d.queued||0)))).catch(e=>alert('MyTube: '+e))})();`
 	);
 
 	let maxChannelBytes = $derived(Math.max(1, ...data.storage.perChannel.map((c) => c.bytes)));
@@ -176,7 +176,7 @@
 	<section class="card p-5">
 		<h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-fg-muted">Bookmarklet</h2>
 		<p class="mb-3 text-xs text-fg-faint">Drag this to your bookmarks bar, then click it on any YouTube page to grab the video.</p>
-		<a href={bookmarklet} class="btn-accent" onclick={(e) => e.preventDefault()}>▶ Grab to Haystack</a>
+		<a href={bookmarklet} class="btn-accent" onclick={(e) => e.preventDefault()}>▶ Grab to MyTube</a>
 		<textarea readonly class="input mt-3 h-24 w-full font-mono text-[11px]" onclick={(e) => e.currentTarget.select()}>{bookmarklet}</textarea>
 	</section>
 

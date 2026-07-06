@@ -8,11 +8,11 @@ import { startWorkers } from '$lib/server/worker';
  * (from Phase 2 on) boots the background worker + scheduler. Guarded so it runs
  * exactly once even across dev HMR reloads.
  */
-const globalForBoot = globalThis as unknown as { __haystackBooted?: boolean };
+const globalForBoot = globalThis as unknown as { __mytubeBooted?: boolean };
 
 export function bootstrap() {
-	if (globalForBoot.__haystackBooted) return;
-	globalForBoot.__haystackBooted = true;
+	if (globalForBoot.__mytubeBooted) return;
+	globalForBoot.__mytubeBooted = true;
 
 	fs.mkdirSync(config.mediaRoot, { recursive: true });
 	fs.mkdirSync(config.dataRoot, { recursive: true });

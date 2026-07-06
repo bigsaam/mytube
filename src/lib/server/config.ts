@@ -19,7 +19,7 @@ function int(v: string | undefined, fallback: number): number {
 }
 
 export const config = {
-	databasePath: env.DATABASE_PATH ?? path.resolve('data/haystack.db'),
+	databasePath: env.DATABASE_PATH ?? path.resolve('data/mytube.db'),
 	mediaRoot: path.resolve(env.MEDIA_ROOT ?? 'media'),
 	dataRoot: path.resolve(env.DATA_ROOT ?? 'data'),
 	origin: env.ORIGIN ?? 'http://localhost:3000',

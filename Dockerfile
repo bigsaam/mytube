@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 ##########################################################################
-# Haystack — self-hosted YouTube frontend
+# MyTube — self-hosted YouTube frontend
 #
 # Single container. yt-dlp + ffmpeg are baked in. Chromium (for the optional
 # recommended-feed module) is installed ONLY when INSTALL_CHROMIUM=true at build
@@ -44,7 +44,7 @@ FROM node:${NODE_VERSION} AS runtime
 ARG YTDLP_VERSION
 ENV NODE_ENV=production \
 	PORT=3000 \
-	DATABASE_PATH=/data/haystack.db \
+	DATABASE_PATH=/data/mytube.db \
 	MEDIA_ROOT=/media \
 	DATA_ROOT=/data \
 	PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
@@ -74,7 +74,7 @@ CMD ["node", "build/index.js"]
 
 ##########################################################################
 # To build WITH the recommended-feed module (Chromium ~+450MB):
-#   docker build --target runtime-chromium -t haystack:chromium .
+#   docker build --target runtime-chromium -t mytube:chromium .
 # Without it (default), the `runtime` target ships no browser at all.
 ##########################################################################
 

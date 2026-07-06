@@ -91,7 +91,7 @@
 		<section class="card p-5 lg:col-span-2">
 			<h2 class="mb-2 text-sm font-semibold uppercase tracking-wide text-fg-muted">History sync</h2>
 			<p class="text-xs text-fg-faint">
-				When you mark a video watched, Haystack tells YouTube it was watched (jittered {s.historySyncMinDelayMin}–{s.historySyncMaxDelayMin} min later) so your
+				When you mark a video watched, MyTube tells YouTube it was watched (jittered {s.historySyncMinDelayMin}–{s.historySyncMaxDelayMin} min later) so your
 				recommendations keep learning. Requires cookies. Per-video opt-out lives in the player menu.
 			</p>
 		</section>

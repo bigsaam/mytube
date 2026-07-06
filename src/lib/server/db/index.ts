@@ -19,9 +19,9 @@ function createDb() {
 }
 
 // Reuse across HMR reloads in dev to avoid leaking file handles.
-const globalForDb = globalThis as unknown as { __haystackDb?: ReturnType<typeof createDb> };
+const globalForDb = globalThis as unknown as { __mytubeDb?: ReturnType<typeof createDb> };
 
-export const db = globalForDb.__haystackDb ?? createDb();
-if (import.meta.env?.DEV) globalForDb.__haystackDb = db;
+export const db = globalForDb.__mytubeDb ?? createDb();
+if (import.meta.env?.DEV) globalForDb.__mytubeDb = db;
 
 export { schema };

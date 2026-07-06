@@ -1,12 +1,12 @@
 services:
-  haystack:
+  mytube:
     build:
       context: .
       # Default build has NO browser. To enable the recommended-feed module,
       # set target: runtime-chromium and RECOMMENDED_FEED_ENABLED=true.
       target: runtime
-    image: haystack:latest
-    container_name: haystack
+    image: mytube:latest
+    container_name: mytube
     restart: unless-stopped
     ports:
       - '3000:3000'

@@ -21,7 +21,7 @@
 	const refresh: SubmitFunction = () => ({ update }) => update({ reset: false });
 </script>
 
-<svelte:head><title>{data.video.title} · Haystack</title></svelte:head>
+<svelte:head><title>{data.video.title} · MyTube</title></svelte:head>
 
 {#if !data.playable}
 	<div class="mx-auto max-w-2xl">
