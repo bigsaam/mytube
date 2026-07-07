@@ -95,6 +95,80 @@ Behavior split in two:
   policy, poll intervals, SponsorBlock categories, recommended-feed filters.
   Stored in the DB; survives restarts.
 
+## Auth
+
+MyTube runs **open (LAN-only)** until you set `AUTH_TOKEN` **or** `AUTH_PASSWORD`
+— then auth is enforced everywhere except `/api/health`, `/login`, `/logout`.
+
+- **Browser** → a login page sets an HMAC-signed httpOnly session cookie.
+  `AUTH_PASSWORD` is the login password; the `AUTH_TOKEN` also works as a
+  break-glass login.
+- **Programmatic** (native app, iOS Shortcuts, bookmarklet) → a **bearer token**:
+  `Authorization: Bearer <token>`, `X-API-Token: <token>`, or `?token=` on media
+  URLs. Use the env `AUTH_TOKEN`, or — better — create **revocable per-device
+  tokens** in *Settings → Access & API tokens* (one per device; hashed at rest,
+  shown once).
+
+Generate a token with `openssl rand -hex 32`. Full endpoint reference and
+client examples: **[docs/API.md](docs/API.md)**.
+
+## Exposing MyTube publicly
+
+MyTube is single-user and API-first, so the recommended posture is: **let a
+tunnel/proxy handle TLS, and let MyTube's own token auth handle identity.** Don't
+put an interactive SSO gate (Cloudflare Access, Authentik-protect-everything) in
+front of the whole app — it breaks the native-app / Shortcuts / `AVPlayer` paths,
+which can't do a browser login. If you want SSO on the browser UI specifically,
+run it in *hybrid* mode with `/api/*` bypassed so bearer clients pass through.
+
+Whatever fronts it, two settings are mandatory:
+
+```bash
+ORIGIN=https://mytube.example.com   # your public HTTPS URL — fixes CSRF, the
+                                    # Secure cookie, and the OAuth redirect URI
+AUTH_TOKEN=<openssl rand -hex 32>   # (or AUTH_PASSWORD) — turns auth on
+```
+
+Getting `ORIGIN` wrong is the #1 gotcha: with it unset behind a proxy, SvelteKit's
+CSRF check rejects every form action (add channel, save settings, login) with a
+403.
+
+### Cloudflare Tunnel (recommended)
+
+The tunnel terminates TLS and hides your origin; MyTube does the auth. No
+Cloudflare Access needed.
+
+```bash
+# .env
+ORIGIN=https://mytube.example.com
+AUTH_TOKEN=<openssl rand -hex 32>
+AUTH_COOKIE_SECURE=true            # (auto-on from an https ORIGIN)
+ADDRESS_HEADER=CF-Connecting-IP    # so login rate-limiting sees real client IPs
+BIND_ADDR=127.0.0.1                # default — don't expose the port on the LAN
+```
+
+`docker compose up -d` now binds `127.0.0.1:3000` only. Point the tunnel at it:
+
+```yaml
+# ~/.cloudflared/config.yml  (cloudflared on the host)
+ingress:
+  - hostname: mytube.example.com
+    service: http://localhost:3000
+  - service: http_status:404
+```
+
+If `cloudflared` runs as a container in this compose project instead, drop the
+published port entirely and use the service name: `service: http://mytube:3000`.
+
+Notes: video range-streaming and the download-progress SSE stream both proxy
+fine through Cloudflare (heartbeats + `no-transform` keep SSE alive). Authed
+media responses are sent `Cache-Control: private` so the edge can't cache and
+serve them without auth. Optionally add a Cloudflare WAF rate-limit rule on
+`/login` for cheap defense-in-depth.
+
+> **Direct LAN access instead?** Set `BIND_ADDR=0.0.0.0` to publish the port on
+> your network, and set `ORIGIN` to `http://<lan-ip>:3000`.
+
 ## Quick-add & bookmarklet
 
 Fling any YouTube URL in from anywhere. The endpoint queues a download and

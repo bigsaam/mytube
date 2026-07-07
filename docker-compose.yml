@@ -9,7 +9,9 @@ services:
     container_name: mytube
     restart: unless-stopped
     ports:
-      - '3000:3000'
+      # Bound to localhost by default — safe for a Cloudflare Tunnel / reverse
+      # proxy on the same host. For direct LAN access set BIND_ADDR=0.0.0.0.
+      - '${BIND_ADDR:-127.0.0.1}:3000:3000'
     volumes:
       - ./data:/data # SQLite DB, config, cookies, browser profile
       - ./media:/media # downloaded videos, thumbnails, subtitles
@@ -22,6 +24,13 @@ services:
       FEED_ITEM_EXPIRY_DAYS: ${FEED_ITEM_EXPIRY_DAYS:-30}
       RECOMMENDED_FEED_ENABLED: ${RECOMMENDED_FEED_ENABLED:-false}
       HISTORY_SYNC_ENABLED: ${HISTORY_SYNC_ENABLED:-false}
+      # Auth (see .env.example). Empty = open LAN-only mode.
+      AUTH_TOKEN: ${AUTH_TOKEN:-}
+      AUTH_PASSWORD: ${AUTH_PASSWORD:-}
+      AUTH_SECRET: ${AUTH_SECRET:-}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-}
+      # Trust the real client IP from a known proxy header (e.g. Cloudflare).
+      ADDRESS_HEADER: ${ADDRESS_HEADER:-}
     healthcheck:
       test: ['CMD', 'node', '-e', "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
