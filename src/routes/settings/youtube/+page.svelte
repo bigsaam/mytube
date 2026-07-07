@@ -48,11 +48,15 @@
 				create a project, enable <em>YouTube Data API v3</em>, create an OAuth <em>Web application</em> client, and add this redirect URI:
 			</p>
 			<code class="mb-3 block break-all rounded bg-bg p-2 text-xs text-fg">{data.redirectUri}</code>
-			<form method="POST" action="?/saveCreds" use:enhance class="flex flex-col gap-2">
-				<input class="input" name="clientId" placeholder="Client ID" autocomplete="off" />
-				<input class="input" name="clientSecret" type="password" placeholder="Client secret" autocomplete="off" />
-				<button class="btn-primary" type="submit">Save credentials</button>
-			</form>
+			{#if data.status.fromEnv}
+				<p class="mb-3 flex items-center gap-2 text-sm text-fg-muted"><Icon name="check" size={16} /> Client credentials loaded from environment.</p>
+			{:else}
+				<form method="POST" action="?/saveCreds" use:enhance class="flex flex-col gap-2">
+					<input class="input" name="clientId" placeholder="Client ID" autocomplete="off" />
+					<input class="input" name="clientSecret" type="password" placeholder="Client secret" autocomplete="off" />
+					<button class="btn-primary" type="submit">Save credentials</button>
+				</form>
+			{/if}
 			{#if data.status.hasClientCreds}
 				<a href="/api/google/connect" class="btn-accent mt-3 w-full" data-sveltekit-reload>Connect YouTube account →</a>
 			{/if}

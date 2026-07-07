@@ -49,6 +49,11 @@ export const config = {
 		return this.origin.startsWith('https://');
 	},
 
+	// Google OAuth client credentials. Env is the source of truth (render from
+	// 1Password); the Settings UI is a fallback that writes them to /data.
+	googleClientId: (env.GOOGLE_OAUTH_CLIENT_ID ?? '').trim() || null,
+	googleClientSecret: (env.GOOGLE_OAUTH_CLIENT_SECRET ?? '').trim() || null,
+
 	// yt-dlp / cookies
 	ytdlpPath: env.YTDLP_PATH ?? 'yt-dlp',
 	get cookiesPath() {

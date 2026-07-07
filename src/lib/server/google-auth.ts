@@ -46,19 +46,32 @@ export function redirectUri(): string {
 	return `${config.origin.replace(/\/$/, '')}/api/google/callback`;
 }
 
+/** Effective client credentials: env (1Password) wins, else the UI-saved file. */
+function clientCreds(): { clientId?: string; clientSecret?: string } {
+	if (config.googleClientId && config.googleClientSecret) {
+		return { clientId: config.googleClientId, clientSecret: config.googleClientSecret };
+	}
+	const c = read();
+	return { clientId: c.clientId, clientSecret: c.clientSecret };
+}
+
 export function setClientCredentials(clientId: string, clientSecret: string): void {
 	const creds = read();
 	write({ ...creds, clientId: clientId.trim(), clientSecret: clientSecret.trim() });
 }
 
-export function authStatus(): { hasClientCreds: boolean; connected: boolean } {
-	const c = read();
-	return { hasClientCreds: !!(c.clientId && c.clientSecret), connected: !!c.refreshToken };
+export function authStatus(): { hasClientCreds: boolean; connected: boolean; fromEnv: boolean } {
+	const cc = clientCreds();
+	return {
+		hasClientCreds: !!(cc.clientId && cc.clientSecret),
+		connected: !!read().refreshToken,
+		fromEnv: !!(config.googleClientId && config.googleClientSecret)
+	};
 }
 
 /** Build the consent URL. `state` is echoed back to the callback (CSRF token). */
 export function getAuthUrl(state: string): string {
-	const c = read();
+	const c = clientCreds();
 	if (!c.clientId) throw new Error('Set your Google OAuth client ID/secret first.');
 	const params = new URLSearchParams({
 		client_id: c.clientId,
@@ -76,7 +89,7 @@ export function getAuthUrl(state: string): string {
 
 /** Exchange an auth code for tokens and persist the refresh token. */
 export async function exchangeCode(code: string): Promise<void> {
-	const c = read();
+	const c = clientCreds();
 	if (!c.clientId || !c.clientSecret) throw new Error('Missing client credentials.');
 	const res = await fetch(TOKEN_ENDPOINT, {
 		method: 'POST',
@@ -100,9 +113,10 @@ export async function exchangeCode(code: string): Promise<void> {
 	if (!res.ok || !data.access_token) {
 		throw new Error(data.error_description ?? data.error ?? 'Token exchange failed');
 	}
+	const base = read();
 	write({
-		...c,
-		refreshToken: data.refresh_token ?? c.refreshToken,
+		...base,
+		refreshToken: data.refresh_token ?? base.refreshToken,
 		accessToken: data.access_token,
 		accessTokenExpiry: Date.now() + (data.expires_in ?? 3600) * 1000
 	});
@@ -110,18 +124,19 @@ export async function exchangeCode(code: string): Promise<void> {
 
 /** Return a valid access token, refreshing if needed. Throws if not connected. */
 export async function getAccessToken(): Promise<string> {
-	const c = read();
-	if (!c.refreshToken) throw new Error('YouTube account not connected.');
-	if (c.accessToken && c.accessTokenExpiry && c.accessTokenExpiry > Date.now() + 60_000) {
-		return c.accessToken;
+	const stored = read();
+	if (!stored.refreshToken) throw new Error('YouTube account not connected.');
+	if (stored.accessToken && stored.accessTokenExpiry && stored.accessTokenExpiry > Date.now() + 60_000) {
+		return stored.accessToken;
 	}
+	const cc = clientCreds();
 	const res = await fetch(TOKEN_ENDPOINT, {
 		method: 'POST',
 		headers: { 'content-type': 'application/x-www-form-urlencoded' },
 		body: new URLSearchParams({
-			client_id: c.clientId ?? '',
-			client_secret: c.clientSecret ?? '',
-			refresh_token: c.refreshToken,
+			client_id: cc.clientId ?? '',
+			client_secret: cc.clientSecret ?? '',
+			refresh_token: stored.refreshToken,
 			grant_type: 'refresh_token'
 		}),
 		signal: AbortSignal.timeout(20_000)
@@ -138,7 +153,7 @@ export async function getAccessToken(): Promise<string> {
 		throw new Error(data.error_description ?? data.error ?? 'Token refresh failed');
 	}
 	write({
-		...c,
+		...stored,
 		accessToken: data.access_token,
 		accessTokenExpiry: Date.now() + (data.expires_in ?? 3600) * 1000
 	});
