@@ -74,6 +74,10 @@ pnpm dev                  # http://localhost:5173
 Requires `yt-dlp` and `ffmpeg` on your PATH for the download pipeline. The DB
 migrates automatically on first boot.
 
+> **Contributing / working on the code?** Read **[AGENTS.md](./AGENTS.md)** — it
+> has the architecture, module map, how-to-extend recipes, and the gotchas. The
+> HTTP API is in [docs/API.md](./docs/API.md).
+
 ### Handy scripts
 
 | Command             | Purpose                              |
