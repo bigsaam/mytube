@@ -26,7 +26,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install with a package manager cache mount for fast rebuilds.
 RUN corepack enable
-COPY package.json pnpm-lock.yaml* ./
+# pnpm-workspace.yaml carries onlyBuiltDependencies — without it, pnpm refuses
+# to run better-sqlite3's native build (ERR_PNPM_IGNORED_BUILDS) and install fails.
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml ./
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
 	pnpm install --frozen-lockfile || pnpm install
 
