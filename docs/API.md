@@ -53,6 +53,15 @@ curl -H "Authorization: Bearer $TOK" "$MT/api/health"
 
 ## Endpoints
 
+### `POST /api/backfill` — refresh stats/comments on old videos
+Queues a metadata-only refetch (no re-download) for every ready video, filling
+in engagement stats and — if comment fetching is on — top comments for videos
+downloaded before those fields existed. Idempotent (jobs dedupe per video).
+```bash
+curl -X POST -H "Authorization: Bearer $TOK" "$MT/api/backfill"
+# → { "enqueued": 12 }
+```
+
 ### `GET /api/health` — liveness (public)
 Always reachable without auth (used by the container healthcheck).
 ```json

@@ -5,6 +5,7 @@ import { runRecommendedScrape } from './recommended-scraper';
 import { enqueueHistorySync, runHistorySync } from './history-sync';
 import { syncPlaylist, removeFromPlaylist, enqueuePlaylistRemove } from './playlist-sync';
 import { setDownloadedHook } from './downloads';
+import { backfillVideo } from './backfill';
 import { getSettings } from './settings';
 
 /**
@@ -48,6 +49,11 @@ export function registerJobHandlers(): void {
 	registerJobHandler('playlist_remove', async (payload) => {
 		const videoId = String(payload.videoId ?? '');
 		if (videoId) await removeFromPlaylist(videoId);
+	});
+
+	registerJobHandler('backfill_metadata', async (payload) => {
+		const videoId = String(payload.videoId ?? '');
+		if (videoId) await backfillVideo(videoId);
 	});
 
 	// When a video is marked watched: ping YouTube history, and — only when the

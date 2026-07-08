@@ -6,6 +6,7 @@ import { getVersion, selfUpdate } from '$lib/server/ytdlp';
 import { authStatus } from '$lib/server/google-auth';
 import { listApiTokens, createApiToken, revokeApiToken } from '$lib/server/auth';
 import { listSharesWithVideo, revokeShare } from '$lib/server/shares';
+import { enqueueBackfillAll } from '$lib/server/backfill';
 import { config } from '$lib/server/config';
 import type { PageServerLoad, Actions } from './$types';
 
@@ -83,6 +84,11 @@ export const actions: Actions = {
 	cleanupNow: async () => {
 		const pruned = cleanupAllWatched();
 		return { cleaned: pruned };
+	},
+
+	backfill: async () => {
+		const enqueued = enqueueBackfillAll();
+		return { backfillEnqueued: enqueued };
 	},
 
 	createToken: async ({ request, locals }) => {

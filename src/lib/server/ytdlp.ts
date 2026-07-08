@@ -314,6 +314,34 @@ export async function downloadVideo(opts: DownloadOptions): Promise<DownloadResu
 	return collectOutputs(opts.targetDir);
 }
 
+/**
+ * Metadata-only refetch for backfilling existing videos: re-writes
+ * `video.info.json` in an already-downloaded video's dir WITHOUT touching the
+ * video file, then returns the parsed info (fresh stats + optionally comments).
+ */
+export async function refetchInfo(opts: {
+	url: string;
+	targetDir: string;
+	fetchComments?: boolean;
+}): Promise<RawInfo | null> {
+	fs.mkdirSync(opts.targetDir, { recursive: true });
+	const args = [
+		opts.url,
+		'--skip-download',
+		'--write-info-json',
+		'-o',
+		path.join(opts.targetDir, 'video.%(ext)s'),
+		'--no-playlist',
+		'--no-colors',
+		...(opts.fetchComments
+			? ['--write-comments', '--extractor-args', `youtube:comment_sort=${COMMENT_SORT};max_comments=${COMMENT_MAX}`]
+			: []),
+		...cookieArgs()
+	];
+	await run(args, { timeoutMs: 5 * 60 * 1000 });
+	return collectOutputs(opts.targetDir).info;
+}
+
 /** After a download, locate the produced files and read info.json. */
 export function collectOutputs(dir: string): DownloadResult {
 	const files = fs.existsSync(dir) ? fs.readdirSync(dir) : [];

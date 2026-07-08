@@ -196,7 +196,8 @@ export const jobs = sqliteTable(
 				'cleanup',
 				'expire_feed',
 				'playlist_sync',
-				'playlist_remove'
+				'playlist_remove',
+				'backfill_metadata'
 			]
 		}).notNull(),
 		payload: text('payload', { mode: 'json' }).$type<Record<string, unknown>>(),

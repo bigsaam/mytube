@@ -334,4 +334,4 @@ removal.
 
 ## License
 
-[MIT](./LICENSE) © 2026 Samvit Monga. Not affiliated with YouTube or Google.
+[MIT](./LICENSE) © 2026 Sam Monga. Not affiliated with YouTube or Google.

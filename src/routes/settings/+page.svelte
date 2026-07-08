@@ -292,6 +292,22 @@
 <!-- Maintenance -->
 <div class="mt-6 grid gap-6 lg:grid-cols-2">
 	<section class="card p-5">
+		<h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-fg-muted">Backfill metadata</h2>
+		<p class="mb-3 text-xs text-fg-faint">
+			Fetch stats {#if s.fetchComments}and top comments {/if}for videos downloaded before those existed. Runs in the
+			background (one metadata-only refetch per video — no re-download).
+		</p>
+		{#if form?.backfillEnqueued != null}
+			<p class="mb-3 rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">
+				Queued {form.backfillEnqueued} video{form.backfillEnqueued === 1 ? '' : 's'} — they'll refresh shortly.
+			</p>
+		{/if}
+		<form method="POST" action="?/backfill" use:enhance>
+			<button class="btn-ghost" type="submit"><Icon name="retry" size={15} /> Backfill existing videos</button>
+		</form>
+	</section>
+
+	<section class="card p-5">
 		<h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-fg-muted">yt-dlp</h2>
 		<p class="mb-3 text-sm text-fg-muted">
 			Version: <span class="font-mono text-fg">{data.ytdlpVersion ?? 'not found'}</span>
