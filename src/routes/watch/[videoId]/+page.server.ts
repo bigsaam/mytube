@@ -48,7 +48,11 @@ export const load: PageServerLoad = ({ params }) => {
 			hasSubtitles: !!video.subtitlePath,
 			chapters: video.chapters ?? [],
 			sponsorblock: video.sponsorblock ?? [],
-			positionSeconds: video.positionSeconds
+			positionSeconds: video.positionSeconds,
+			viewCount: video.viewCount,
+			likeCount: video.likeCount,
+			commentCount: video.commentCount,
+			comments: video.comments ?? []
 		}
 	};
 };

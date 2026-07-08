@@ -1,5 +1,38 @@
 import { describe, it, expect } from 'vitest';
-import { formatDuration, formatBytes, timestampToSeconds, parseDescription } from './format';
+import {
+	formatDuration,
+	formatBytes,
+	formatCount,
+	formatUntil,
+	timestampToSeconds,
+	parseDescription
+} from './format';
+
+describe('formatCount', () => {
+	it('formats compact counts', () => {
+		expect(formatCount(0)).toBe('0');
+		expect(formatCount(999)).toBe('999');
+		expect(formatCount(1000)).toBe('1K');
+		expect(formatCount(1234)).toBe('1.2K');
+		expect(formatCount(3_400_000)).toBe('3.4M');
+		expect(formatCount(1_000_000_000)).toBe('1B');
+		expect(formatCount(150_000)).toBe('150K');
+	});
+	it('returns empty for nullish/invalid', () => {
+		expect(formatCount(null)).toBe('');
+		expect(formatCount(undefined)).toBe('');
+		expect(formatCount(-1)).toBe('');
+	});
+});
+
+describe('formatUntil', () => {
+	it('describes a future date and marks past ones expired', () => {
+		expect(formatUntil(Date.now() + 3 * 86400_000)).toBe('in 3d');
+		expect(formatUntil(Date.now() + 2 * 3600_000)).toBe('in 2h');
+		expect(formatUntil(Date.now() - 1000)).toBe('expired');
+		expect(formatUntil(null)).toBe('');
+	});
+});
 
 describe('formatDuration', () => {
 	it('formats mm:ss and h:mm:ss', () => {

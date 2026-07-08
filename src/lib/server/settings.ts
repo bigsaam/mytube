@@ -11,11 +11,19 @@ export interface AppSettings {
 	// Downloads
 	defaultMaxHeight: number;
 	preferH264: boolean;
+	// Fetch top comments (bounded) into each download's info.json + library.
+	fetchComments: boolean;
 
 	// Lifecycle / cleanup
 	cleanupPolicy: 'keep_forever' | 'delete_after_days' | 'delete_immediately';
 	cleanupKeepDays: number;
 	autoMarkWatchedPercent: number;
+	// Treat the synced playlist as a pure download queue: remove an item from
+	// the YouTube playlist once it's DOWNLOADED (vs. once watched).
+	playlistRemoveOnDownload: boolean;
+	// On each cleanup sweep, prune watched (unkept) videos that came from the
+	// synced playlist, regardless of the global cleanupPolicy.
+	cleanupPlaylistWatched: boolean;
 
 	// SponsorBlock
 	sponsorblockEnabled: boolean;
@@ -56,10 +64,13 @@ export interface AppSettings {
 export const DEFAULT_SETTINGS: AppSettings = {
 	defaultMaxHeight: config.defaultMaxHeight,
 	preferH264: true,
+	fetchComments: true,
 
 	cleanupPolicy: 'keep_forever',
 	cleanupKeepDays: 30,
 	autoMarkWatchedPercent: 90,
+	playlistRemoveOnDownload: true,
+	cleanupPlaylistWatched: true,
 
 	sponsorblockEnabled: true,
 	sponsorblockAutoSkip: true,

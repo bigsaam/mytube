@@ -1,7 +1,9 @@
 <script lang="ts">
 	import Player from '$lib/components/Player.svelte';
 	import Icon from '$lib/components/Icon.svelte';
-	import { formatDuration, formatRelative, parseDescription } from '$lib/format';
+	import Footer from '$lib/components/Footer.svelte';
+	import Comments from '$lib/components/Comments.svelte';
+	import { formatDuration, formatRelative, formatCount, parseDescription } from '$lib/format';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -53,6 +55,8 @@
 				{#if data.video.channelName}<span class="font-medium text-fg">{data.video.channelName}</span>{/if}
 				{#if data.video.durationSeconds}<span>· {formatDuration(data.video.durationSeconds)}</span>{/if}
 				{#if data.video.uploadDate}<span>· {formatRelative(data.video.uploadDate)}</span>{/if}
+				{#if data.video.viewCount != null}<span>· {formatCount(data.video.viewCount)} views</span>{/if}
+				{#if data.video.likeCount != null}<span>· {formatCount(data.video.likeCount)} likes</span>{/if}
 			</div>
 
 			{#if data.video.chapters.length > 0}
@@ -81,7 +85,12 @@
 				</div>
 			{/if}
 
-			<p class="mt-6 text-center text-xs text-fg-faint">Shared from a private MyTube library.</p>
+			<Comments comments={data.video.comments} totalCount={data.video.commentCount} />
+
+			<p class="mt-8 text-center text-xs text-fg-faint">Shared from a private MyTube library.</p>
 		{/if}
+		<div class="mt-6 border-t border-line pt-6">
+			<Footer />
+		</div>
 	</div>
 </div>

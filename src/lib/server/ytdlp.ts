@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { config } from './config';
-import type { Chapter } from './db/schema';
+import type { Chapter, CommentNode, CommentThread } from './db/schema';
 
 /**
  * The ONE place that knows how to talk to yt-dlp. All flags, format selection,
@@ -64,6 +64,22 @@ export interface RawInfo {
 	is_live?: boolean;
 	was_live?: boolean;
 	thumbnail?: string;
+	view_count?: number;
+	like_count?: number;
+	comment_count?: number;
+	comments?: RawComment[];
+}
+
+/** A single comment as yt-dlp emits it into info.json (`--write-comments`). */
+export interface RawComment {
+	id?: string;
+	parent?: string; // 'root' for top-level, else the parent comment id
+	text?: string;
+	author?: string;
+	author_thumbnail?: string;
+	author_is_uploader?: boolean;
+	like_count?: number;
+	timestamp?: number; // unix seconds
 }
 
 /* ------------------------------------------------------------------ spawn */
@@ -223,9 +239,17 @@ export interface DownloadOptions {
 	subLangs?: string;
 	/** Categories to physically cut from the file (yt-dlp --sponsorblock-remove). */
 	sponsorblockRemove?: string[];
+	/** Fetch top comments into the info.json (bounded — see COMMENT_LIMITS). */
+	fetchComments?: boolean;
 	onProgress?: (p: DownloadProgress) => void;
 	signal?: AbortSignal;
 }
+
+// Bounded comment fetch: top-sorted, 20 parents, ≤5 replies each. Keeps the
+// extra request cheap and the stored blob small. Format is yt-dlp's
+// max_comments=<total>,<parents>,<replies-total>,<replies-per-thread>.
+const COMMENT_MAX = 'all,20,all,5';
+const COMMENT_SORT = 'top';
 
 /** Download a video + thumbnail + subs + info.json into targetDir/video.*. */
 export async function downloadVideo(opts: DownloadOptions): Promise<DownloadResult> {
@@ -255,6 +279,9 @@ export async function downloadVideo(opts: DownloadOptions): Promise<DownloadResu
 		'download:HAYPROG|%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s',
 		...(opts.sponsorblockRemove?.length
 			? ['--sponsorblock-remove', opts.sponsorblockRemove.join(',')]
+			: []),
+		...(opts.fetchComments
+			? ['--write-comments', '--extractor-args', `youtube:comment_sort=${COMMENT_SORT};max_comments=${COMMENT_MAX}`]
 			: []),
 		...cookieArgs()
 	];
@@ -313,6 +340,44 @@ export function collectOutputs(dir: string): DownloadResult {
 	}
 
 	return { videoPath, thumbnailPath, subtitlePath, infoJsonPath, info };
+}
+
+/**
+ * Build a capped, threaded comment snapshot from info.json. yt-dlp returns a
+ * flat list where top-level comments have `parent === 'root'` and replies carry
+ * their parent's id. We keep the top-20 parents (order preserved) with up to 5
+ * replies each. Returns null when comments weren't fetched / none exist.
+ */
+export function commentsFromInfo(info: RawInfo | null): CommentThread[] | null {
+	const raw = info?.comments;
+	if (!raw?.length) return null;
+
+	const toNode = (c: RawComment): CommentNode => ({
+		author: c.author ?? 'Unknown',
+		authorThumbnail: c.author_thumbnail,
+		authorIsUploader: c.author_is_uploader,
+		text: c.text ?? '',
+		likeCount: c.like_count,
+		timestamp: c.timestamp
+	});
+
+	const repliesByParent = new Map<string, RawComment[]>();
+	for (const c of raw) {
+		if (c.parent && c.parent !== 'root' && c.id) {
+			const list = repliesByParent.get(c.parent) ?? [];
+			list.push(c);
+			repliesByParent.set(c.parent, list);
+		}
+	}
+
+	const threads: CommentThread[] = [];
+	for (const c of raw) {
+		if (c.parent && c.parent !== 'root') continue; // reply — handled below
+		const replies = (c.id ? repliesByParent.get(c.id) : undefined) ?? [];
+		threads.push({ ...toNode(c), replies: replies.slice(0, 5).map(toNode) });
+		if (threads.length >= 20) break;
+	}
+	return threads.length ? threads : null;
 }
 
 export function chaptersFromInfo(info: RawInfo | null): Chapter[] | null {

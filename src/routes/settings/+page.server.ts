@@ -54,8 +54,11 @@ export const actions: Actions = {
 		const patch: Partial<AppSettings> = {
 			defaultMaxHeight: num(form, 'defaultMaxHeight', cur.defaultMaxHeight),
 			preferH264: bool(form, 'preferH264'),
+			fetchComments: bool(form, 'fetchComments'),
 			cleanupPolicy: (String(form.get('cleanupPolicy')) as AppSettings['cleanupPolicy']) || cur.cleanupPolicy,
 			cleanupKeepDays: num(form, 'cleanupKeepDays', cur.cleanupKeepDays),
+			playlistRemoveOnDownload: bool(form, 'playlistRemoveOnDownload'),
+			cleanupPlaylistWatched: bool(form, 'cleanupPlaylistWatched'),
 			autoMarkWatchedPercent: Math.min(100, Math.max(50, num(form, 'autoMarkWatchedPercent', cur.autoMarkWatchedPercent))),
 			sponsorblockEnabled: bool(form, 'sponsorblockEnabled'),
 			sponsorblockAutoSkip: bool(form, 'sponsorblockAutoSkip'),

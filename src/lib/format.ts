@@ -39,6 +39,40 @@ export function formatRelative(date: Date | number | null | undefined): string {
 	return `${Math.floor(months / 12)}y ago`;
 }
 
+/** Compact engagement count: 1234 → "1.2K", 3_400_000 → "3.4M". */
+export function formatCount(n: number | null | undefined): string {
+	if (n == null || !Number.isFinite(n) || n < 0) return '';
+	if (n < 1000) return String(n);
+	for (const [suffix, div] of [
+		['B', 1e9],
+		['M', 1e6],
+		['K', 1e3]
+	] as const) {
+		if (n >= div) {
+			const v = n / div;
+			return `${v >= 100 ? Math.round(v) : v.toFixed(1).replace(/\.0$/, '')}${suffix}`;
+		}
+	}
+	return String(n);
+}
+
+/** Human "time until" a future date: "in 29d", "in 3h"; "expired" if past. */
+export function formatUntil(date: Date | number | null | undefined): string {
+	if (date == null) return '';
+	const t = typeof date === 'number' ? date : date.getTime();
+	const diff = t - Date.now();
+	if (diff <= 0) return 'expired';
+	const mins = Math.floor(diff / 60000);
+	if (mins < 60) return `in ${Math.max(1, mins)}m`;
+	const hours = Math.floor(mins / 60);
+	if (hours < 24) return `in ${hours}h`;
+	const days = Math.floor(hours / 24);
+	if (days < 30) return `in ${days}d`;
+	const months = Math.floor(days / 30);
+	if (months < 12) return `in ${months}mo`;
+	return `in ${Math.floor(months / 12)}y`;
+}
+
 /** "1:02:03" → seconds, for clickable description timestamps. */
 export function timestampToSeconds(ts: string): number | null {
 	const parts = ts.split(':').map((p) => Number.parseInt(p, 10));

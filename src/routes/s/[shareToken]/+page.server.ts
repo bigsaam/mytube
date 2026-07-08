@@ -27,6 +27,10 @@ export const load: PageServerLoad = ({ params }) => {
 			channelName: video.channelName,
 			durationSeconds: video.durationSeconds,
 			uploadDate: video.uploadDate,
+			viewCount: video.viewCount,
+			likeCount: video.likeCount,
+			commentCount: video.commentCount,
+			comments: video.comments ?? [],
 			hasSubtitles: !!video.subtitlePath,
 			chapters: video.chapters ?? [],
 			sponsorblock: video.sponsorblock ?? []

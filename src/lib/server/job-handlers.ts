@@ -4,6 +4,8 @@ import { runCleanupSweep, setWatchedHook } from './lifecycle';
 import { runRecommendedScrape } from './recommended-scraper';
 import { enqueueHistorySync, runHistorySync } from './history-sync';
 import { syncPlaylist, removeFromPlaylist, enqueuePlaylistRemove } from './playlist-sync';
+import { setDownloadedHook } from './downloads';
+import { getSettings } from './settings';
 
 /**
  * Wires job types to their handlers + registers cross-module hooks. Called once
@@ -48,10 +50,17 @@ export function registerJobHandlers(): void {
 		if (videoId) await removeFromPlaylist(videoId);
 	});
 
-	// When a video is marked watched: (optionally) ping YouTube history AND
-	// remove it from the synced playlist. Both self-gate on their flags.
+	// When a video is marked watched: ping YouTube history, and — only when the
+	// playlist is NOT acting as a pure download queue — remove it from the synced
+	// playlist now. Both self-gate on their own flags too.
 	setWatchedHook((videoId) => {
 		enqueueHistorySync(videoId);
-		enqueuePlaylistRemove(videoId);
+		if (!getSettings().playlistRemoveOnDownload) enqueuePlaylistRemove(videoId);
+	});
+
+	// Playlist-as-queue: remove an item from the synced playlist as soon as it's
+	// downloaded, so the playlist only ever holds not-yet-grabbed videos.
+	setDownloadedHook((videoId) => {
+		if (getSettings().playlistRemoveOnDownload) enqueuePlaylistRemove(videoId);
 	});
 }

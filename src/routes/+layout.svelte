@@ -3,6 +3,7 @@
 	import { page } from '$app/stores';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import QuickAdd from '$lib/components/QuickAdd.svelte';
+	import Footer from '$lib/components/Footer.svelte';
 	import type { LayoutData } from './$types';
 
 	let { children, data }: { children: import('svelte').Snippet; data: LayoutData } = $props();
@@ -26,6 +27,9 @@
 
 		<main class="flex-1 overflow-y-auto px-6 py-6">
 			{@render children()}
+			<div class="mt-10 pt-4">
+				<Footer subtle />
+			</div>
 		</main>
 	</div>
 </div>

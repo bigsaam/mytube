@@ -8,6 +8,7 @@ import {
 	probe,
 	downloadVideo,
 	chaptersFromInfo,
+	commentsFromInfo,
 	YtDlpError,
 	type RawInfo
 } from './ytdlp';
@@ -16,6 +17,16 @@ import { channelSlug } from './slug';
 import { fetchSponsorSegments } from './sponsorblock';
 import { parseUploadDate } from './ytdlp';
 import { bus } from './events';
+
+/**
+ * Fired after a video finishes downloading and its library row is persisted
+ * (status → ready). Registered in job-handlers so downloads.ts stays free of
+ * dependencies on playlist-sync et al. (which import back into this module).
+ */
+let downloadedHook: ((videoId: string) => void) | null = null;
+export function setDownloadedHook(fn: (videoId: string) => void): void {
+	downloadedHook = fn;
+}
 
 /**
  * Download queue: DB-backed, restart-safe. The worker loop calls `tick()`;
@@ -204,6 +215,7 @@ async function process(id: number): Promise<void> {
 			maxHeight: dl.maxHeight ?? settings.defaultMaxHeight,
 			preferH264: settings.preferH264,
 			sponsorblockRemove: cutCategories,
+			fetchComments: settings.fetchComments,
 			onProgress: (prog) => {
 				if (Math.abs(prog.percent - lastWrittenPct) < 0.005 && prog.stage === dl.stage) return;
 				lastWrittenPct = prog.percent;
@@ -244,8 +256,12 @@ async function process(id: number): Promise<void> {
 				height: info?.height ?? null,
 				container: 'mp4',
 				filesizeBytes: fileSize(result.videoPath),
+				viewCount: info?.view_count ?? null,
+				likeCount: info?.like_count ?? null,
+				commentCount: info?.comment_count ?? null,
 				chapters: chaptersFromInfo(info),
 				sponsorblock,
+				comments: commentsFromInfo(info),
 				status: 'ready',
 				filesDeleted: false,
 				downloadedAt: new Date()
@@ -259,6 +275,7 @@ async function process(id: number): Promise<void> {
 			.run();
 
 		bus.emit('download:update', { id, videoId: dl.videoId, done: true });
+		downloadedHook?.(dl.videoId);
 	} catch (err) {
 		handleFailure(dl, err);
 	}

@@ -1,8 +1,9 @@
 <script lang="ts">
-	import { formatDuration, formatRelative, parseDescription } from '$lib/format';
+	import { formatDuration, formatRelative, formatUntil, formatCount, parseDescription } from '$lib/format';
 	import Player from '$lib/components/Player.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import Comments from '$lib/components/Comments.svelte';
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import type { PageData } from './$types';
@@ -77,6 +78,8 @@
 					{/if}
 					{#if data.video.durationSeconds}<span>· {formatDuration(data.video.durationSeconds)}</span>{/if}
 					{#if data.video.uploadDate}<span>· {formatRelative(data.video.uploadDate)}</span>{/if}
+					{#if data.video.viewCount != null}<span title="Views at download time">· {formatCount(data.video.viewCount)} views</span>{/if}
+					{#if data.video.likeCount != null}<span title="Likes at download time">· {formatCount(data.video.likeCount)} likes</span>{/if}
 				</div>
 
 				<div class="ml-auto flex items-center gap-2">
@@ -97,11 +100,11 @@
 						</button>
 					</form>
 
-					<!-- Pin (exempt from cleanup) -->
+					<!-- Keep on disk (exempt from cleanup) -->
 					<form method="POST" action="?/pin" use:enhance={refresh}>
 						<input type="hidden" name="videoId" value={data.video.videoId} />
 						<input type="hidden" name="pinned" value={data.video.pinned ? '0' : '1'} />
-						<button class="btn-ghost {data.video.pinned ? 'text-accent' : ''}" type="submit" title="Pin (keep, exempt from cleanup)">
+						<button class="btn-ghost {data.video.pinned ? 'text-accent' : ''}" type="submit" title="Keep on disk (exempt from cleanup)">
 							<Icon name="pin" size={16} />
 						</button>
 					</form>
@@ -191,7 +194,7 @@
 									<code class="text-fg-muted">{s.tokenPrefix}…</code>
 									{#if s.label}<span class="font-medium">{s.label}</span>{/if}
 									<span class="text-xs text-fg-faint">
-										{s.revoked ? 'revoked' : s.expiresAt ? `expires ${formatRelative(s.expiresAt)}` : 'never expires'} ·
+										{s.revoked ? 'revoked' : s.expiresAt ? `expires ${formatUntil(s.expiresAt)}` : 'never expires'} ·
 										{s.viewCount} view{s.viewCount === 1 ? '' : 's'}
 									</span>
 									<div class="ml-auto">
@@ -236,6 +239,9 @@
 					{/each}
 				</div>
 			{/if}
+
+			<!-- Comments (snapshot at download) -->
+			<Comments comments={data.video.comments} totalCount={data.video.commentCount} />
 		</div>
 	</div>
 {/if}

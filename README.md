@@ -132,6 +132,20 @@ to the rest of your library**. Links are:
 Tokens are stored hashed; the full link is shown once at creation. For a friend
 to reach the link, MyTube must be reachable at your public `ORIGIN` (see below).
 
+## Stats, comments & the playlist queue
+
+- **Engagement stats** — view/like/comment counts are snapshotted from each
+  download's `info.json` and shown on the watch page (and share pages). They're
+  a *point-in-time* capture ("… at download"), not live.
+- **Comments** — on by default (*Settings → Downloads*), MyTube fetches the top
+  **20 comment threads with up to 5 replies each** into the library and renders
+  them under the video. Turn it off to speed up downloads.
+- **Playlist as a queue** — with playlist sync on, MyTube can treat the synced
+  playlist as a pure download queue: items are removed from the YouTube playlist
+  **once downloaded** (not once watched), and watched playlist videos are
+  auto-cleaned on the next sweep unless you mark them **Keep**. Both are toggles
+  in *Settings → Watched & cleanup*.
+
 ## Exposing MyTube publicly
 
 MyTube is single-user and API-first, so the recommended posture is: **let a

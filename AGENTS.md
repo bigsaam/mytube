@@ -81,6 +81,7 @@ Two queues, both restart-safe, both driven by `worker.ts` intervals:
 | `history-sync.ts` | `yt-dlp --mark-watched` write-back |
 | `auth.ts` | token/session auth (bearer + HMAC cookie) |
 | `shares.ts` | per-video public share links (scoped, revocable, expiring) |
+| — | *playlist-queue:* `downloads.ts` fires a `downloaded` hook (registered in `job-handlers.ts`) that removes an item from the synced playlist on download when `playlistRemoveOnDownload` is set; the watched-hook does it otherwise. `lifecycle.ts` `runCleanupSweep` has a second pass for playlist-sourced watched videos. |
 | `media-serve.ts` | shared file-serving helpers for `/api/*` + `/s/*` media routes |
 | `events.ts` / `library.ts` | SSE event bus / library+download queries |
 

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Icon from '$lib/components/Icon.svelte';
-	import { formatBytes, formatRelative } from '$lib/format';
+	import { formatBytes, formatRelative, formatUntil } from '$lib/format';
 	import { enhance } from '$app/forms';
 	import { page } from '$app/stores';
 	import type { PageData, ActionData } from './$types';
@@ -93,9 +93,13 @@
 						{#each HEIGHTS as h (h)}<option value={h} selected={s.defaultMaxHeight === h}>{h}p</option>{/each}
 					</select>
 				</label>
-				<label class="flex items-center gap-3 text-sm">
+				<label class="mb-3 flex items-center gap-3 text-sm">
 					<input type="checkbox" name="preferH264" checked={s.preferH264} class="accent-accent" />
 					Prefer H.264/AAC (best browser compatibility, no transcoding)
+				</label>
+				<label class="flex items-center gap-3 text-sm">
+					<input type="checkbox" name="fetchComments" checked={s.fetchComments} class="accent-accent" />
+					Fetch top comments (20 threads, 5 replies each) — adds time to each download
 				</label>
 			</section>
 
@@ -115,11 +119,19 @@
 						{#each POLICIES as p (p.v)}<option value={p.v} selected={s.cleanupPolicy === p.v}>{p.label}</option>{/each}
 					</select>
 				</label>
-				<label class="flex items-center justify-between gap-4">
+				<label class="mb-3 flex items-center justify-between gap-4">
 					<span class="text-sm">Keep watched for (days)</span>
 					<input type="number" name="cleanupKeepDays" min="1" value={s.cleanupKeepDays} class="input w-20" />
 				</label>
-				<p class="mt-2 text-xs text-fg-faint">Pinned videos are always exempt. Deleting files keeps the history record; the video can be re-grabbed.</p>
+				<label class="mb-2 flex items-center gap-3 text-sm">
+					<input type="checkbox" name="cleanupPlaylistWatched" checked={s.cleanupPlaylistWatched} class="accent-accent" />
+					Auto-clean watched videos from the synced playlist (queue mode)
+				</label>
+				<label class="flex items-center gap-3 text-sm">
+					<input type="checkbox" name="playlistRemoveOnDownload" checked={s.playlistRemoveOnDownload} class="accent-accent" />
+					Remove from the YouTube playlist once downloaded (vs. once watched)
+				</label>
+				<p class="mt-2 text-xs text-fg-faint">Kept videos (the "Keep" toggle) are always exempt. Deleting files keeps the history record; the video can be re-grabbed.</p>
 			</section>
 
 			<!-- SponsorBlock -->
@@ -256,7 +268,7 @@
 						{s.label ? `${s.label} — ` : ''}{s.videoTitle ?? s.videoId}
 					</a>
 					<span class="shrink-0 text-xs text-fg-faint">
-						{s.revoked ? 'revoked' : s.expiresAt ? `expires ${formatRelative(s.expiresAt)}` : 'never expires'} ·
+						{s.revoked ? 'revoked' : s.expiresAt ? `expires ${formatUntil(s.expiresAt)}` : 'never expires'} ·
 						{s.viewCount} view{s.viewCount === 1 ? '' : 's'}
 					</span>
 					<div class="ml-auto shrink-0">

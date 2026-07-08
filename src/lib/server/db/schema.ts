@@ -90,8 +90,16 @@ export const videos = sqliteTable(
 		container: text('container'),
 		filesizeBytes: integer('filesize_bytes'),
 
+		// Engagement stats — a point-in-time snapshot from the info.json at
+		// download (NOT live). Displayed as "… at download".
+		viewCount: integer('view_count'),
+		likeCount: integer('like_count'),
+		commentCount: integer('comment_count'),
+
 		chapters: text('chapters', { mode: 'json' }).$type<Chapter[]>(),
 		sponsorblock: text('sponsorblock', { mode: 'json' }).$type<SponsorSegment[]>(),
+		// Top comments (capped) snapshotted at download; null when not fetched.
+		comments: text('comments', { mode: 'json' }).$type<CommentThread[]>(),
 
 		// Lifecycle
 		// 'pending' -> 'downloading' -> 'ready' | 'failed'; 'deleted' = files pruned.
@@ -279,6 +287,19 @@ export interface SponsorSegment {
 	start: number; // seconds
 	end: number;
 	uuid?: string;
+}
+
+/** A top-level comment plus a capped set of replies, snapshotted at download. */
+export interface CommentNode {
+	author: string;
+	authorThumbnail?: string;
+	authorIsUploader?: boolean;
+	text: string;
+	likeCount?: number;
+	timestamp?: number; // unix seconds, as yt-dlp reports it
+}
+export interface CommentThread extends CommentNode {
+	replies: CommentNode[];
 }
 
 export type Channel = typeof channels.$inferSelect;

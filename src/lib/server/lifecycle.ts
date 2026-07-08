@@ -79,33 +79,50 @@ export function deleteFiles(videoId: string): boolean {
 }
 
 /**
- * Run the configured cleanup policy. Returns how many videos were pruned.
- * - keep_forever      → no-op
- * - delete_immediately→ any watched, unpinned, still-present video
- * - delete_after_days → watched longer than N days ago
+ * Run the cleanup policy. Returns how many videos were pruned. Two passes,
+ * unioned (a video pinned/"kept" is exempt from both):
+ * - Global policy over ALL videos:
+ *     keep_forever → no-op · delete_immediately → any watched · delete_after_days
+ *     → watched longer than N days ago.
+ * - Playlist-queue pass (when cleanupPlaylistWatched): watched videos that came
+ *     from the synced playlist are pruned every sweep, regardless of the global
+ *     policy — so the playlist behaves as a transient download queue.
  */
 export function runCleanupSweep(): number {
 	const s = getSettings();
-	if (s.cleanupPolicy === 'keep_forever') return 0;
+	const ids = new Set<string>();
 
-	const conds = [
-		eq(videos.watched, true),
-		eq(videos.pinned, false),
-		eq(videos.filesDeleted, false),
-		isNotNull(videos.videoPath)
-	];
-	if (s.cleanupPolicy === 'delete_after_days') {
-		const cutoff = Date.now() - s.cleanupKeepDays * 24 * 60 * 60 * 1000;
-		conds.push(lt(videos.watchedAt, new Date(cutoff)));
+	if (s.cleanupPolicy !== 'keep_forever') {
+		const conds = [
+			eq(videos.watched, true),
+			eq(videos.pinned, false),
+			eq(videos.filesDeleted, false),
+			isNotNull(videos.videoPath)
+		];
+		if (s.cleanupPolicy === 'delete_after_days') {
+			const cutoff = Date.now() - s.cleanupKeepDays * 24 * 60 * 60 * 1000;
+			conds.push(lt(videos.watchedAt, new Date(cutoff)));
+		}
+		for (const t of db.select({ videoId: videos.videoId }).from(videos).where(and(...conds)).all()) {
+			ids.add(t.videoId);
+		}
 	}
-	const targets = db
-		.select({ videoId: videos.videoId })
-		.from(videos)
-		.where(and(...conds))
-		.all();
+
+	if (s.cleanupPlaylistWatched) {
+		const conds = [
+			eq(videos.watched, true),
+			eq(videos.pinned, false),
+			eq(videos.filesDeleted, false),
+			isNotNull(videos.videoPath),
+			isNotNull(videos.sourcePlaylistId)
+		];
+		for (const t of db.select({ videoId: videos.videoId }).from(videos).where(and(...conds)).all()) {
+			ids.add(t.videoId);
+		}
+	}
 
 	let pruned = 0;
-	for (const t of targets) if (deleteFiles(t.videoId)) pruned++;
+	for (const id of ids) if (deleteFiles(id)) pruned++;
 	return pruned;
 }
 
