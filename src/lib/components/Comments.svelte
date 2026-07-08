@@ -8,6 +8,18 @@
 	}
 	let { comments, totalCount = null }: Props = $props();
 
+	// Collapse the whole section, and reveal each thread's replies on demand —
+	// keeps the initial DOM small (top-level comments only) so the page stays snappy.
+	let open = $state(true);
+	let expanded = $state<Set<number>>(new Set());
+
+	function toggleReplies(i: number) {
+		const next = new Set(expanded);
+		if (next.has(i)) next.delete(i);
+		else next.add(i);
+		expanded = next;
+	}
+
 	function initial(name: string): string {
 		return (name.replace(/^@/, '')[0] ?? '?').toUpperCase();
 	}
@@ -15,24 +27,43 @@
 
 {#if comments.length}
 	<section class="card mt-4 p-4">
-		<h2 class="text-sm font-semibold">
-			Comments{totalCount ? ` · ${formatCount(totalCount)}` : ''}
-		</h2>
-		<p class="mb-4 mt-0.5 text-xs text-fg-faint">Top comments, captured at download time.</p>
-		<ul class="flex flex-col gap-4">
-			{#each comments as c, i (i)}
-				<li>
-					{@render comment(c)}
-					{#if c.replies.length}
-						<ul class="mt-3 flex flex-col gap-3 border-l border-line pl-4">
-							{#each c.replies as r, j (j)}
-								<li>{@render comment(r)}</li>
-							{/each}
-						</ul>
-					{/if}
-				</li>
-			{/each}
-		</ul>
+		<button
+			type="button"
+			class="flex w-full items-center gap-2 text-left"
+			onclick={() => (open = !open)}
+			aria-expanded={open}
+		>
+			<span class="text-sm font-semibold">Comments{totalCount ? ` · ${formatCount(totalCount)}` : ''}</span>
+			<span class="ml-auto text-xs text-fg-faint">{open ? 'Hide' : 'Show'}</span>
+			<span class="text-xs text-fg-faint transition-transform {open ? 'rotate-90' : ''}">▸</span>
+		</button>
+
+		{#if open}
+			<p class="mb-4 mt-2 text-xs text-fg-faint">Top comments, captured at download time.</p>
+			<ul class="flex flex-col gap-4">
+				{#each comments as c, i (i)}
+					<li class="[contain-intrinsic-size:auto_64px] [content-visibility:auto]">
+						{@render comment(c)}
+						{#if c.replies.length}
+							{#if expanded.has(i)}
+								<ul class="mt-3 flex flex-col gap-3 border-l border-line pl-4">
+									{#each c.replies as r, j (j)}<li>{@render comment(r)}</li>{/each}
+								</ul>
+							{/if}
+							<button
+								type="button"
+								class="mt-2 text-xs font-medium text-accent hover:underline"
+								onclick={() => toggleReplies(i)}
+							>
+								{expanded.has(i)
+									? 'Hide replies'
+									: `View ${c.replies.length} repl${c.replies.length === 1 ? 'y' : 'ies'}`}
+							</button>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+		{/if}
 	</section>
 {/if}
 

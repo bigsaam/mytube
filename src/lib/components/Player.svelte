@@ -251,7 +251,7 @@
 	/* ------------------------------------------------- controls autohide */
 	let hideTimer: ReturnType<typeof setTimeout> | undefined;
 	function nudgeControls() {
-		controlsVisible = true;
+		if (!controlsVisible) controlsVisible = true;
 		clearTimeout(hideTimer);
 		hideTimer = setTimeout(() => {
 			if (!paused && !scrubbing && !showSpeed) controlsVisible = false;
@@ -275,7 +275,6 @@
 	bind:this={container}
 	class="group relative overflow-hidden rounded-xl bg-black"
 	class:cursor-none={!controlsVisible && !paused}
-	onmousemove={nudgeControls}
 	onpointermove={nudgeControls}
 	role="region"
 	aria-label="Video player"
