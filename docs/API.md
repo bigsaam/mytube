@@ -27,6 +27,24 @@ device so a lost phone doesn't force a full rotation).
 Unauthenticated requests get `401 {"error":"unauthorized"}` for `/api/*`, or a
 303 redirect to `/login` for pages.
 
+### Public share links (`/s/…`)
+
+Share links are the one exception to the auth rule above. A share token
+(`mts_…`, created from a video's **Share** button) grants unauthenticated read
+access to **exactly one video** via these routes — and nothing else:
+
+| Route | Serves |
+| --- | --- |
+| `GET /s/<token>` | the public watch page for that video |
+| `GET /s/<token>/stream` | the video file (range-aware) |
+| `GET /s/<token>/thumb` | the thumbnail |
+| `GET /s/<token>/subs` | the WebVTT subtitles |
+
+A share token is **not** a credential for the rest of the API — it is never
+accepted as `Authorization: Bearer`, `X-API-Token`, or `?token=`. Unknown,
+revoked, or expired tokens return `404` (indistinguishable from a missing one).
+Manage links in **Settings → Shared links**.
+
 ```bash
 export MT=https://mytube.example.com
 export TOK=mt_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

@@ -116,6 +116,22 @@ MyTube runs **open (LAN-only)** until you set `AUTH_TOKEN` **or** `AUTH_PASSWORD
 Generate a token with `openssl rand -hex 32`. Full endpoint reference and
 client examples: **[docs/API.md](docs/API.md)**.
 
+## Sharing a single video
+
+Open any ready video and click **Share** to mint a public link
+(`https://your-mytube/s/<token>`). Anyone with the link can watch **that one
+video** — its stream, thumbnail, and subtitles — with no login and **no access
+to the rest of your library**. Links are:
+
+- **Scoped** — a share token only ever resolves to its one video, and is only
+  accepted on the `/s/…` routes (never as a normal bearer token).
+- **Expiring** — default 30 days; choose 1 / 7 / 30 days or *never* at creation.
+- **Revocable** — kill a link instantly from the video's Share panel or from
+  **Settings → Shared links** (which lists every active link).
+
+Tokens are stored hashed; the full link is shown once at creation. For a friend
+to reach the link, MyTube must be reachable at your public `ORIGIN` (see below).
+
 ## Exposing MyTube publicly
 
 MyTube is single-user and API-first, so the recommended posture is: **let a

@@ -7,8 +7,8 @@
 
 	let { children, data }: { children: import('svelte').Snippet; data: LayoutData } = $props();
 
-	// The login page renders without the app chrome.
-	let bare = $derived($page.url.pathname === '/login');
+	// The login page and public share pages render without the app chrome.
+	let bare = $derived($page.url.pathname === '/login' || $page.url.pathname.startsWith('/s/'));
 </script>
 
 {#if bare}

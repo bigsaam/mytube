@@ -5,6 +5,7 @@ import { cleanupAllWatched } from '$lib/server/lifecycle';
 import { getVersion, selfUpdate } from '$lib/server/ytdlp';
 import { authStatus } from '$lib/server/google-auth';
 import { listApiTokens, createApiToken, revokeApiToken } from '$lib/server/auth';
+import { listSharesWithVideo, revokeShare } from '$lib/server/shares';
 import { config } from '$lib/server/config';
 import type { PageServerLoad, Actions } from './$types';
 
@@ -29,6 +30,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 		youtube: authStatus(),
 		authEnabled: locals.authEnabled,
 		apiTokens: locals.authEnabled ? listApiTokens() : [],
+		shares: listSharesWithVideo(),
+		shareOrigin: config.origin,
 		flags: {
 			recommendedFeedEnabled: config.recommendedFeedEnabled,
 			historySyncEnabled: config.historySyncEnabled
@@ -93,6 +96,13 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const id = Number(form.get('id'));
 		if (Number.isFinite(id)) revokeApiToken(id);
+		return { revoked: true };
+	},
+
+	revokeShare: async ({ request }) => {
+		const form = await request.formData();
+		const id = Number(form.get('id'));
+		if (Number.isFinite(id)) revokeShare(id);
 		return { revoked: true };
 	}
 };

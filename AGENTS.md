@@ -80,6 +80,8 @@ Two queues, both restart-safe, both driven by `worker.ts` intervals:
 | `playlist-sync.ts` / `youtube-api.ts` / `google-auth.ts` | Data-API playlist loop / API client / OAuth |
 | `history-sync.ts` | `yt-dlp --mark-watched` write-back |
 | `auth.ts` | token/session auth (bearer + HMAC cookie) |
+| `shares.ts` | per-video public share links (scoped, revocable, expiring) |
+| `media-serve.ts` | shared file-serving helpers for `/api/*` + `/s/*` media routes |
 | `events.ts` / `library.ts` | SSE event bus / library+download queries |
 
 **Isolation is deliberate:** YouTube breaks constantly, so all yt-dlp flags live

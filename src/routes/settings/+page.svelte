@@ -240,6 +240,43 @@
 	</section>
 {/if}
 
+<!-- Shared links -->
+<section class="card mt-6 p-5">
+	<h2 class="mb-1 text-sm font-semibold uppercase tracking-wide text-fg-muted">Shared links</h2>
+	<p class="mb-4 text-xs text-fg-faint">
+		Per-video public links (created from a video's <strong>Share</strong> button). Each grants access to that one
+		video only. Revoke here to kill a link immediately.
+	</p>
+	{#if data.shares.length}
+		<ul class="divide-y divide-line rounded-lg border border-line">
+			{#each data.shares as s (s.id)}
+				<li class="flex items-center gap-3 p-3 text-sm {s.revoked ? 'opacity-50' : ''}">
+					<code class="shrink-0 text-fg-muted">{s.tokenPrefix}…</code>
+					<a href="/watch/{s.videoId}" class="min-w-0 flex-1 truncate font-medium hover:text-white">
+						{s.label ? `${s.label} — ` : ''}{s.videoTitle ?? s.videoId}
+					</a>
+					<span class="shrink-0 text-xs text-fg-faint">
+						{s.revoked ? 'revoked' : s.expiresAt ? `expires ${formatRelative(s.expiresAt)}` : 'never expires'} ·
+						{s.viewCount} view{s.viewCount === 1 ? '' : 's'}
+					</span>
+					<div class="ml-auto shrink-0">
+						{#if s.revoked}
+							<span class="chip text-fg-faint">revoked</span>
+						{:else}
+							<form method="POST" action="?/revokeShare" use:enhance>
+								<input type="hidden" name="id" value={s.id} />
+								<button class="btn-ghost px-2 py-1 text-xs text-red-400/80" type="submit">Revoke</button>
+							</form>
+						{/if}
+					</div>
+				</li>
+			{/each}
+		</ul>
+	{:else}
+		<p class="text-sm text-fg-faint">No shared links yet. Open any video and click <strong>Share</strong> to create one.</p>
+	{/if}
+</section>
+
 <!-- Maintenance -->
 <div class="mt-6 grid gap-6 lg:grid-cols-2">
 	<section class="card p-5">

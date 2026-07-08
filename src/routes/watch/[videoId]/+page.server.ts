@@ -8,6 +8,7 @@ import { enqueueDownload } from '$lib/server/downloads';
 import { getSetting } from '$lib/server/settings';
 import { config } from '$lib/server/config';
 import { isVideoId } from '$lib/server/slug';
+import { createShare, revokeShare, listSharesForVideo } from '$lib/server/shares';
 import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = ({ params }) => {
@@ -39,6 +40,9 @@ export const load: PageServerLoad = ({ params }) => {
 		playable: true as const,
 		autoSkipDefault: getSetting('sponsorblockAutoSkip'),
 		historySyncEnabled: config.historySyncEnabled,
+		authEnabled: config.authEnabled,
+		shareOrigin: config.origin,
+		shares: listSharesForVideo(video.videoId),
 		video: {
 			...common,
 			hasSubtitles: !!video.subtitlePath,
@@ -100,6 +104,24 @@ export const actions: Actions = {
 		const videoId = id(form);
 		const optout = form.get('optout') === '1';
 		db.update(videos).set({ historySyncOptout: optout }).where(eq(videos.videoId, videoId)).run();
+		return { ok: true };
+	},
+
+	createShare: async ({ request }) => {
+		const form = await request.formData();
+		const videoId = id(form);
+		const raw = String(form.get('expiresInDays') ?? '30');
+		const expiresInDays = raw === 'never' ? null : Number(raw) || 30;
+		const label = String(form.get('label') ?? '');
+		const { token } = createShare(videoId, { expiresInDays, label });
+		// Plaintext token returned once so the page can show the full link.
+		return { shareToken: token };
+	},
+
+	revokeShare: async ({ request }) => {
+		const form = await request.formData();
+		const shareId = Number(form.get('shareId'));
+		if (Number.isFinite(shareId)) revokeShare(shareId);
 		return { ok: true };
 	},
 

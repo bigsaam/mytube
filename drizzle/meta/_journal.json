@@ -22,6 +22,13 @@
       "when": 1783370069369,
       "tag": "0002_dashing_goliath",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1783497496053,
+      "tag": "0003_jittery_white_queen",
+      "breakpoints": true
     }
   ]
 }

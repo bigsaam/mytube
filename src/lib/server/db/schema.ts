@@ -235,6 +235,30 @@ export const apiTokens = sqliteTable('api_tokens', {
 	lastUsedAt: integer('last_used_at', { mode: 'timestamp_ms' })
 });
 
+/* -------------------------------------------------------------------- shares */
+// Per-video public share links. A share grants unauthenticated read access to
+// exactly ONE video's stream/thumb/subs via the `/s/` routes — never the rest
+// of the app. The token is stored hashed (sha256), like `api_tokens`, and is
+// deliberately NOT accepted by the normal bearer-auth path.
+export const shares = sqliteTable(
+	'shares',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		videoId: text('video_id').notNull(),
+		tokenHash: text('token_hash').notNull().unique(),
+		tokenPrefix: text('token_prefix').notNull(), // e.g. "mts_ab12cd" for display
+		label: text('label'), // optional note, e.g. "for Alice"
+		expiresAt: integer('expires_at', { mode: 'timestamp_ms' }), // null = never
+		revoked: integer('revoked', { mode: 'boolean' }).notNull().default(false),
+		viewCount: integer('view_count').notNull().default(0),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().default(now),
+		lastUsedAt: integer('last_used_at', { mode: 'timestamp_ms' })
+	},
+	(t) => ({
+		byVideo: index('idx_shares_video').on(t.videoId)
+	})
+);
+
 /* ------------------------------------------------------------------ settings */
 // Simple typed key/value store. Values are JSON-encoded text.
 export const settings = sqliteTable('settings', {
@@ -265,3 +289,4 @@ export type Job = typeof jobs.$inferSelect;
 export type WatchProgress = typeof watchProgress.$inferSelect;
 export type Setting = typeof settings.$inferSelect;
 export type ApiToken = typeof apiTokens.$inferSelect;
+export type Share = typeof shares.$inferSelect;

@@ -20,7 +20,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	const { pathname } = event.url;
-	if (PUBLIC_PATHS.has(pathname)) {
+	// Public share links (`/s/<token>` + their scoped media) do their own
+	// per-token check inside the route and grant access to one video only.
+	if (PUBLIC_PATHS.has(pathname) || pathname.startsWith('/s/')) {
 		event.locals.authed = isAuthenticated(event);
 		return resolve(event);
 	}

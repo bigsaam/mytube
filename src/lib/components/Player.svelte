@@ -13,6 +13,12 @@
 		positionSeconds?: number;
 		autoSkipDefault?: boolean;
 		theater?: boolean;
+		/** Public share mode: no server-side progress/history writes, and media
+		 * is fetched from the scoped `/s/…` URLs below instead of `/api/…`. */
+		share?: boolean;
+		streamSrc?: string;
+		posterSrc?: string;
+		subsSrc?: string;
 	}
 	let {
 		videoId,
@@ -22,8 +28,16 @@
 		sponsorblock = [],
 		positionSeconds = 0,
 		autoSkipDefault = true,
-		theater = $bindable(false)
+		theater = $bindable(false),
+		share = false,
+		streamSrc,
+		posterSrc,
+		subsSrc
 	}: Props = $props();
+
+	let streamUrl = $derived(streamSrc ?? `/api/stream/${videoId}`);
+	let posterUrl = $derived(posterSrc ?? `/api/thumb/${videoId}`);
+	let subsUrl = $derived(subsSrc ?? `/api/subs/${videoId}`);
 
 	// SponsorBlock category → seekbar color.
 	const SB_COLORS: Record<string, string> = {
@@ -95,6 +109,7 @@
 	/* ----------------------------------------------------- progress sync */
 	let lastSent = 0;
 	function flushProgress(useBeacon = false) {
+		if (share) return; // public share: never write watch progress back
 		if (!video || duration <= 0) return;
 		const pos = video.currentTime;
 		if (Math.abs(pos - lastSent) < 1 && !useBeacon) return;
@@ -269,8 +284,8 @@
 	<video
 		bind:this={video}
 		class="aspect-video w-full bg-black"
-		src="/api/stream/{videoId}"
-		poster="/api/thumb/{videoId}"
+		src={streamUrl}
+		poster={posterUrl}
 		autoplay
 		bind:paused
 		bind:volume
@@ -281,7 +296,7 @@
 		ondblclick={toggleFullscreen}
 	>
 		{#if hasSubtitles}
-			<track kind="subtitles" src="/api/subs/{videoId}" srclang="en" label="English" />
+			<track kind="subtitles" src={subsUrl} srclang="en" label="English" />
 		{/if}
 	</video>
 

@@ -1,11 +1,12 @@
 import { error } from '@sveltejs/kit';
+import { verifyShare } from '$lib/server/shares';
 import { serveVideo } from '$lib/server/media-serve';
-import { isVideoId } from '$lib/server/slug';
 import type { RequestHandler } from './$types';
 
 const handler: RequestHandler = ({ params, request }) => {
-	if (!isVideoId(params.videoId)) error(400, 'Bad video id');
-	return serveVideo(params.videoId, request);
+	const share = verifyShare(params.shareToken);
+	if (!share) error(404, 'Not found');
+	return serveVideo(share.videoId, request);
 };
 
 export const GET = handler;

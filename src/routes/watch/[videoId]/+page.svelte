@@ -7,14 +7,26 @@
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import type { PageData } from './$types';
 
-	let { data }: { data: PageData } = $props();
+	let { data, form }: { data: PageData; form: import('./$types').ActionData } = $props();
 	let player = $state<{ seekTo: (t: number) => void }>();
 	let theater = $state(false);
+	let showShare = $state(false);
+	let copied = $state(false);
 
 	let descParts = $derived(data.video.description ? parseDescription(data.video.description) : []);
 
 	function jump(seconds: number | null) {
 		if (seconds != null) player?.seekTo(seconds);
+	}
+
+	async function copyLink(url: string) {
+		try {
+			await navigator.clipboard.writeText(url);
+			copied = true;
+			setTimeout(() => (copied = false), 1500);
+		} catch {
+			/* clipboard blocked — the link is selectable in the box */
+		}
 	}
 
 	// Re-run the page load after a lifecycle action so the buttons reflect state.
@@ -94,6 +106,16 @@
 						</button>
 					</form>
 
+					<!-- Share (per-video public link) -->
+					<button
+						class="btn-ghost {showShare ? 'text-accent' : ''}"
+						type="button"
+						onclick={() => (showShare = !showShare)}
+						title="Share this video"
+					>
+						<Icon name="share" size={16} />
+					</button>
+
 					<!-- History-sync opt-out (only when the integration is enabled) -->
 					{#if data.historySyncEnabled}
 						<form method="POST" action="?/historyOptout" use:enhance={refresh}>
@@ -112,6 +134,80 @@
 					{/if}
 				</div>
 			</div>
+
+			<!-- Share panel -->
+			{#if showShare}
+				<div class="card mt-3 p-4">
+					<div class="flex items-center justify-between">
+						<h2 class="text-sm font-semibold">Share this video</h2>
+						<button class="text-fg-faint hover:text-fg" type="button" onclick={() => (showShare = false)} aria-label="Close">
+							<Icon name="x" size={16} />
+						</button>
+					</div>
+					<p class="mt-1 text-xs text-fg-faint">
+						Anyone with the link can watch just this one video — no access to the rest of your library. Revoke any time.
+					</p>
+					{#if !data.authEnabled}
+						<p class="mt-1 text-xs text-amber-400/90">
+							Auth is off (LAN-only) — your whole instance is already open, so share links add nothing until you set
+							<code>AUTH_TOKEN</code>.
+						</p>
+					{/if}
+
+					{#if form?.shareToken}
+						<div class="mt-3 rounded-lg border border-accent/40 bg-accent-soft p-3">
+							<p class="mb-1 text-xs text-accent">Link created — copy it now:</p>
+							<div class="flex items-center gap-2">
+								<code class="block flex-1 break-all rounded bg-bg p-2 text-xs">{data.shareOrigin}/s/{form.shareToken}</code>
+								<button class="btn-primary shrink-0" type="button" onclick={() => copyLink(`${data.shareOrigin}/s/${form.shareToken}`)}>
+									{copied ? 'Copied' : 'Copy'}
+								</button>
+							</div>
+						</div>
+					{/if}
+
+					<form method="POST" action="?/createShare" use:enhance={refresh} class="mt-3 flex flex-wrap items-end gap-2">
+						<input type="hidden" name="videoId" value={data.video.videoId} />
+						<label class="flex flex-col gap-1 text-xs text-fg-muted">
+							Label (optional)
+							<input class="input" name="label" placeholder="e.g. for Alice" />
+						</label>
+						<label class="flex flex-col gap-1 text-xs text-fg-muted">
+							Expires
+							<select class="input" name="expiresInDays">
+								<option value="1">1 day</option>
+								<option value="7">7 days</option>
+								<option value="30" selected>30 days</option>
+								<option value="never">Never</option>
+							</select>
+						</label>
+						<button class="btn-accent" type="submit"><Icon name="share" size={15} /> Create link</button>
+					</form>
+
+					{#if data.shares.length}
+						<ul class="mt-4 divide-y divide-line rounded-lg border border-line">
+							{#each data.shares as s (s.id)}
+								<li class="flex items-center gap-3 p-3 text-sm {s.revoked ? 'opacity-50' : ''}">
+									<code class="text-fg-muted">{s.tokenPrefix}…</code>
+									{#if s.label}<span class="font-medium">{s.label}</span>{/if}
+									<span class="text-xs text-fg-faint">
+										{s.revoked ? 'revoked' : s.expiresAt ? `expires ${formatRelative(s.expiresAt)}` : 'never expires'} ·
+										{s.viewCount} view{s.viewCount === 1 ? '' : 's'}
+									</span>
+									<div class="ml-auto">
+										{#if !s.revoked}
+											<form method="POST" action="?/revokeShare" use:enhance={refresh}>
+												<input type="hidden" name="shareId" value={s.id} />
+												<button class="btn-ghost px-2 py-1 text-xs text-red-400/80" type="submit">Revoke</button>
+											</form>
+										{/if}
+									</div>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+				</div>
+			{/if}
 
 			<!-- Chapters -->
 			{#if data.video.chapters.length > 0}

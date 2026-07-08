@@ -1,9 +1,10 @@
 import { error } from '@sveltejs/kit';
+import { verifyShare } from '$lib/server/shares';
 import { serveThumb } from '$lib/server/media-serve';
-import { isVideoId } from '$lib/server/slug';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = ({ params, request }) => {
-	if (!isVideoId(params.videoId)) error(400, 'Bad video id');
-	return serveThumb(params.videoId, request);
+	const share = verifyShare(params.shareToken);
+	if (!share) error(404, 'Not found');
+	return serveThumb(share.videoId, request);
 };
