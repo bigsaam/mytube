@@ -242,8 +242,9 @@ fling videos in from anywhere on iOS.
 ## YouTube playlist sync — the phone loop
 
 The headline workflow: **add a video to a playlist on your phone → MyTube grabs
-it → you watch it here → it's removed from the playlist.** No app needed on the
-phone; just the normal YouTube Save button.
+it → it leaves the playlist (so the playlist stays a clean to-download queue) →
+you watch it here.** No app needed on the phone; just the normal YouTube Save
+button.
 
 Because YouTube's built-in **Watch Later** is not reachable by any API (Google
 deprecated that in 2016), MyTube syncs a **normal playlist you create** — e.g.
@@ -268,8 +269,12 @@ deprecated that in 2016), MyTube syncs a **normal playlist you create** — e.g.
 - Watch here — **sponsor/intro/outro segments are cut from the file on download**
   by default (yt-dlp `--sponsorblock-remove`; switch to in-player skipping in
   Settings), and there are no ads (it's a local file).
-- At ≥90% watched, MyTube calls `playlistItems.delete` to remove it from the
-  playlist. Failures retry and never block local playback.
+- MyTube calls `playlistItems.delete` to remove it from the playlist **once
+  it's downloaded** by default (the playlist acts as a pure queue), or *once
+  watched* if you prefer — toggle in *Settings → Watched & cleanup*. Failures
+  retry and never block local playback.
+- Watched playlist videos are auto-cleaned from disk on the next sweep unless you
+  mark them **Keep** (also a toggle there).
 
 OAuth client secret + refresh token live in a `0600` file under `/data`, never
 in the DB and never sent to the browser.
@@ -322,5 +327,11 @@ feed item never syncs anything.
 
 ## Non-goals (v1)
 
-No transcoding/HLS, no auth/multi-user, no comments. The only write-back to
-YouTube is the optional watched-history ping.
+No transcoding/HLS and no **multi-user** accounts — auth is single-user
+(token / password / session, plus scoped per-video share links). Write-backs to
+YouTube are limited to the optional watched-history ping and playlist-queue
+removal.
+
+## License
+
+[MIT](./LICENSE) © 2026 Samvit Monga. Not affiliated with YouTube or Google.
