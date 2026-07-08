@@ -289,16 +289,19 @@ writes back to YouTube.
 
 Scrapes your own logged-in YouTube homepage with Playwright (Chromium):
 
-1. Build the browser image: `docker build --target runtime-chromium -t mytube:chromium .`
-   (or set `target: runtime-chromium` in compose). Chromium adds ~450 MB.
-2. Export `cookies.txt` with the **Get cookies.txt LOCALLY** extension while
+1. Run the **Chromium image variant** — the default `:latest` is slim and has no
+   browser. Use `ghcr.io/bigsaam/mytube:chromium` (published by CI) in your
+   compose `image:`, or build locally with
+   `docker build --target runtime-chromium -t mytube:chromium .`. Chromium adds ~450 MB.
+2. Set `RECOMMENDED_FEED_ENABLED=true`.
+3. Export `cookies.txt` with the **Get cookies.txt LOCALLY** extension while
    logged into YouTube, and upload it under **Settings → Recommended feed**.
 
 It seeds a **persistent** browser profile (`/data/browser-profile`) from those
 cookies, polls 2–4×/day (jittered, one session, images/media/fonts blocked),
 pulls `ytInitialData` + `/youtubei/v1/browse` continuations (no DOM scraping),
-and drops normalized items into the same feed with `source=recommended`
-(deduped against subscriptions + the library; Shorts/mixes/live filtered by
+and drops normalized items into the **Discover** page's recommendation pool
+(deduped against the library + pool; Shorts/mixes/live filtered by
 default). All JSON parsing is isolated in `src/lib/server/recommended.ts` with
 fixture tests. On a consent wall / captcha / logged-out page it **pauses and
 shows a “needs attention” banner** in Settings rather than retrying.

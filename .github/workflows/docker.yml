@@ -43,16 +43,31 @@ jobs:
             type=sha
             type=semver,pattern={{version}}
 
-      - name: Build & push
+      - name: Build & push (slim, no Chromium)
         uses: docker/build-push-action@v6
         with:
           context: .
-          # `runtime` (no Chromium) — the recommended-feed module is off by
-          # default. Build runtime-chromium separately if/when it's enabled.
+          # Slim default (`:latest`) — no Chromium. Use the `:chromium` tag below
+          # to run the recommended-feed module (needs Playwright/Chromium).
           target: runtime
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build & push (Chromium variant, for the recommended feed)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runtime-chromium
+          platforms: linux/amd64
+          push: true
+          # `:chromium` tracks the default branch; `:<sha>-chromium` pins a build.
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/mytube:chromium
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/mytube:sha-${{ github.sha }}-chromium
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
