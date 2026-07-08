@@ -1,7 +1,10 @@
+import fs from 'node:fs';
 import { and, desc, eq, inArray, lt } from 'drizzle-orm';
 import { db } from './db';
-import { recommendations, videos, type Recommendation } from './db/schema';
+import { recommendations, videos, jobs, type Recommendation } from './db/schema';
 import { enqueueDownload } from './downloads';
+import { enqueueJob } from './jobs';
+import { config } from './config';
 
 /**
  * The "Discover" recommendation pool. Scraped items (see recommended-scraper.ts)
@@ -127,4 +130,49 @@ export function grabRecommendation(id: number, watchLater = false): void {
 
 export function dismissRecommendation(id: number): void {
 	db.update(recommendations).set({ status: 'dismissed' }).where(eq(recommendations.id, id)).run();
+}
+
+/* ------------------------------------------------------- on-demand refresh */
+
+// Manual refreshes are rate-capped so "endless" never becomes "hammering YT".
+const MANUAL_MIN_INTERVAL_MS = 5 * 60 * 1000;
+
+export interface RefreshResult {
+	status: 'queued' | 'rate_limited' | 'disabled' | 'no_cookies';
+	message: string;
+	retryAfterSec?: number;
+}
+
+/**
+ * Queue an on-demand recommended-feed scrape, gated on the feature flag +
+ * cookies and rate-limited vs. the last scrape (scheduled or manual). Enqueues
+ * with the same dedupe key the scheduler uses, so it coalesces with a pending
+ * scheduled scrape.
+ */
+export function requestManualScrape(): RefreshResult {
+	if (!config.recommendedFeedEnabled) {
+		return { status: 'disabled', message: 'The recommended feed is disabled.' };
+	}
+	if (!fs.existsSync(config.cookiesPath)) {
+		return { status: 'no_cookies', message: 'Upload your YouTube cookies first (Settings → Recommended feed).' };
+	}
+	const last = db
+		.select({ createdAt: jobs.createdAt })
+		.from(jobs)
+		.where(eq(jobs.type, 'recommended_scrape'))
+		.orderBy(desc(jobs.createdAt))
+		.limit(1)
+		.get();
+	if (last) {
+		const elapsed = Date.now() - last.createdAt.getTime();
+		if (elapsed < MANUAL_MIN_INTERVAL_MS) {
+			return {
+				status: 'rate_limited',
+				message: 'Just refreshed — give it a few minutes before trying again.',
+				retryAfterSec: Math.ceil((MANUAL_MIN_INTERVAL_MS - elapsed) / 1000)
+			};
+		}
+	}
+	enqueueJob('recommended_scrape', {}, { dedupeKey: 'recommended_scrape' });
+	return { status: 'queued', message: 'Fetching fresh recommendations — they’ll appear in a moment.' };
 }

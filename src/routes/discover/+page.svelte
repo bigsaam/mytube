@@ -2,6 +2,8 @@
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import FeedCard from '$lib/components/FeedCard.svelte';
+	import Icon from '$lib/components/Icon.svelte';
+	import { invalidateAll } from '$app/navigation';
 	import type { PageData } from './$types';
 	import type { DiscoverCard } from '$lib/server/discover';
 
@@ -34,6 +36,25 @@
 		}
 	}
 
+	let refreshing = $state(false);
+	async function refresh() {
+		if (refreshing) return;
+		refreshing = true;
+		try {
+			const res = await fetch('/api/recommended/refresh', { method: 'POST' });
+			const body = (await res.json()) as { status: string; message: string };
+			flash(body.message);
+			// A scrape is async (Playwright ~10–20s). Pull the new pool shortly after.
+			if (body.status === 'queued') {
+				setTimeout(() => invalidateAll(), 18_000);
+			}
+		} catch {
+			flash('Refresh failed');
+		} finally {
+			refreshing = false;
+		}
+	}
+
 	async function loadMore() {
 		if (loading || done || !items.length) return;
 		loading = true;
@@ -53,7 +74,12 @@
 	}
 </script>
 
-<PageHeader title="Discover" subtitle="Recommended for you — pulled from your YouTube home, ad- and sponsor-free" />
+<div class="flex items-start justify-between gap-4">
+	<PageHeader title="Discover" subtitle="Recommended for you — pulled from your YouTube home, ad- and sponsor-free" />
+	<button class="btn-ghost mt-1 shrink-0" onclick={refresh} disabled={refreshing} title="Fetch fresh recommendations now">
+		<Icon name="retry" size={15} /> {refreshing ? 'Refreshing…' : 'Refresh'}
+	</button>
+</div>
 
 {#if items.length === 0}
 	<EmptyState
