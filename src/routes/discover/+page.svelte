@@ -1,0 +1,94 @@
+<script lang="ts">
+	import PageHeader from '$lib/components/PageHeader.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
+	import FeedCard from '$lib/components/FeedCard.svelte';
+	import type { PageData } from './$types';
+	import type { DiscoverCard } from '$lib/server/discover';
+
+	let { data }: { data: PageData } = $props();
+	let items = $state<DiscoverCard[]>(data.items);
+	$effect(() => {
+		items = data.items;
+	});
+
+	let loading = $state(false);
+	let done = $state(data.items.length < data.pageSize);
+	let toast = $state<string | null>(null);
+	function flash(msg: string) {
+		toast = msg;
+		setTimeout(() => (toast = null), 2500);
+	}
+
+	async function onAction(id: number, action: 'grab' | 'watchLater' | 'dismiss') {
+		items = items.filter((i) => i.id !== id);
+		try {
+			const res = await fetch('/api/recommended', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ id, action })
+			});
+			if (!res.ok) throw new Error();
+			flash(action === 'dismiss' ? 'Dismissed' : action === 'watchLater' ? 'Grabbing → Watch Later' : 'Grabbing');
+		} catch {
+			flash('Something went wrong');
+		}
+	}
+
+	async function loadMore() {
+		if (loading || done || !items.length) return;
+		loading = true;
+		try {
+			const before = items[items.length - 1].id;
+			const res = await fetch(`/api/recommended?before=${before}&limit=${data.pageSize}`);
+			const body = (await res.json()) as { items: DiscoverCard[] };
+			const seen = new Set(items.map((i) => i.id));
+			const fresh = (body.items ?? []).filter((i) => !seen.has(i.id));
+			items = [...items, ...fresh];
+			if (fresh.length < data.pageSize) done = true;
+		} catch {
+			flash('Could not load more');
+		} finally {
+			loading = false;
+		}
+	}
+</script>
+
+<PageHeader title="Discover" subtitle="Recommended for you — pulled from your YouTube home, ad- and sponsor-free" />
+
+{#if items.length === 0}
+	<EmptyState
+		icon="discover"
+		title="No recommendations yet"
+		hint={data.feedEnabled
+			? 'The recommended feed runs a few times a day. Upload your YouTube cookies in Settings if you haven’t, then check back.'
+			: 'Enable the recommended feed (RECOMMENDED_FEED_ENABLED) and upload your YouTube cookies to start seeing recommendations.'}
+	/>
+{:else}
+	<div class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+		{#each items as item (item.id)}
+			<FeedCard
+				id={item.id}
+				videoId={item.videoId}
+				title={item.title}
+				channelName={item.channelName}
+				durationSeconds={item.durationSeconds}
+				thumbnailUrl={item.thumbnailUrl}
+				{onAction}
+			/>
+		{/each}
+	</div>
+
+	{#if !done}
+		<div class="mt-8 flex justify-center">
+			<button class="btn-ghost" onclick={loadMore} disabled={loading}>
+				{loading ? 'Loading…' : 'Load more'}
+			</button>
+		</div>
+	{/if}
+{/if}
+
+{#if toast}
+	<div class="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-lg bg-bg-raised px-4 py-2 text-sm shadow-xl">
+		{toast}
+	</div>
+{/if}

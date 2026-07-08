@@ -268,6 +268,38 @@ export const shares = sqliteTable(
 	})
 );
 
+/* ---------------------------------------------------------- recommendations */
+// The rolling "Discover" pool scraped from YouTube's personalized surfaces
+// (home page today; watch-page up-next later). Kept separate from feed_items so
+// the Feed stays subscription-only and Discover can grow/rank independently.
+export const recommendations = sqliteTable(
+	'recommendations',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		videoId: text('video_id').notNull().unique(),
+		title: text('title').notNull(),
+		channelName: text('channel_name'),
+		channelId: text('channel_id'),
+		thumbnailUrl: text('thumbnail_url'),
+		durationSeconds: integer('duration_seconds'),
+		badges: text('badges', { mode: 'json' }).$type<string[]>(),
+		// Where it came from, for provenance/ranking. 'upnext' carries sourceVideoId.
+		source: text('source', { enum: ['home', 'upnext'] })
+			.notNull()
+			.default('home'),
+		sourceVideoId: text('source_video_id'),
+		rank: integer('rank').notNull().default(0),
+		status: text('status', { enum: ['new', 'downloaded', 'dismissed', 'not_interested'] })
+			.notNull()
+			.default('new'),
+		seenAt: integer('seen_at', { mode: 'timestamp_ms' }).notNull().default(now),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().default(now)
+	},
+	(t) => ({
+		byStatus: index('idx_rec_status').on(t.status, t.seenAt)
+	})
+);
+
 /* ------------------------------------------------------------------ settings */
 // Simple typed key/value store. Values are JSON-encoded text.
 export const settings = sqliteTable('settings', {
@@ -312,3 +344,4 @@ export type WatchProgress = typeof watchProgress.$inferSelect;
 export type Setting = typeof settings.$inferSelect;
 export type ApiToken = typeof apiTokens.$inferSelect;
 export type Share = typeof shares.$inferSelect;
+export type Recommendation = typeof recommendations.$inferSelect;

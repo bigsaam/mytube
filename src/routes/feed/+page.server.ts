@@ -6,5 +6,6 @@ import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = () => {
 	const channelCount = db.select({ n: sql<number>`count(*)` }).from(channels).get()?.n ?? 0;
-	return { items: listFeed(), channelCount };
+	// Feed is subscription-only now; recommendations live on /discover.
+	return { items: listFeed('subscription'), channelCount };
 };

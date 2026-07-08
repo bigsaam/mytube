@@ -10,6 +10,7 @@
 
 	let nav = $derived([
 		{ href: '/feed', label: 'Feed', icon: 'feed', badge: counts?.feed },
+		{ href: '/discover', label: 'Discover', icon: 'discover', badge: 0 },
 		{ href: '/watch-later', label: 'Watch Later', icon: 'watch-later', badge: counts?.watchLater },
 		{ href: '/library', label: 'Library', icon: 'library', badge: 0 },
 		{ href: '/channels', label: 'Channels', icon: 'channels', badge: 0 },

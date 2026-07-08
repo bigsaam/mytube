@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { config } from './config';
 import { getSettings, setSetting } from './settings';
 import { extractRecommended, type RecommendedItem } from './recommended';
-import { ingestRecommended } from './feed';
+import { ingestRecommended } from './discover';
 
 /**
  * Playwright driver for the recommended feed. Isolated from parsing (see

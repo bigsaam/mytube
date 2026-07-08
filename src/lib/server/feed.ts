@@ -98,58 +98,6 @@ export function ingestEntries(channel: Channel, entries: FeedEntry[]): number {
 	return added;
 }
 
-/**
- * Ingest recommended-feed items. Deduped against the library and against
- * subscription feed items so the same upload never shows twice. Returns the
- * number of genuinely new items added.
- */
-export function ingestRecommended(
-	items: {
-		videoId: string;
-		title: string;
-		channelName: string | null;
-		channelId: string | null;
-		durationSeconds: number | null;
-		thumbnailUrl: string | null;
-	}[]
-): number {
-	if (!items.length) return 0;
-	const ids = items.map((i) => i.videoId);
-
-	const known = new Set(
-		db.select({ v: videos.videoId }).from(videos).where(inArray(videos.videoId, ids)).all().map((r) => r.v)
-	);
-	// Any existing feed row (subscription OR a prior recommended row) suppresses.
-	const existing = new Set(
-		db
-			.select({ v: feedItems.videoId })
-			.from(feedItems)
-			.where(inArray(feedItems.videoId, ids))
-			.all()
-			.map((r) => r.v)
-	);
-
-	let added = 0;
-	for (const it of items) {
-		if (known.has(it.videoId) || existing.has(it.videoId)) continue;
-		db.insert(feedItems)
-			.values({
-				videoId: it.videoId,
-				source: 'recommended',
-				channelId: it.channelId,
-				channelName: it.channelName,
-				title: it.title,
-				thumbnailUrl: it.thumbnailUrl,
-				durationSeconds: it.durationSeconds,
-				status: 'new'
-			})
-			.onConflictDoNothing()
-			.run();
-		added++;
-	}
-	return added;
-}
-
 /** Fill in a feed item's duration (metadata job). Best-effort. */
 export async function fillFeedItemDuration(videoId: string): Promise<void> {
 	const item = db

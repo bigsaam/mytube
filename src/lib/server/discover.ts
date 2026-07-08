@@ -1,0 +1,130 @@
+import { and, desc, eq, inArray, lt } from 'drizzle-orm';
+import { db } from './db';
+import { recommendations, videos, type Recommendation } from './db/schema';
+import { enqueueDownload } from './downloads';
+
+/**
+ * The "Discover" recommendation pool. Scraped items (see recommended-scraper.ts)
+ * are ingested here; the Discover page browses the pool and Grab/Dismiss act on
+ * it. Kept separate from feed.ts so the Feed stays subscription-only.
+ */
+
+export interface IngestOptions {
+	source?: Recommendation['source']; // 'home' (default) | 'upnext'
+	sourceVideoId?: string | null; // provenance for up-next
+}
+
+export interface IngestItem {
+	videoId: string;
+	title: string;
+	channelName: string | null;
+	channelId: string | null;
+	durationSeconds: number | null;
+	thumbnailUrl: string | null;
+	badges?: string[];
+}
+
+/**
+ * Ingest recommended items in ranked order (input order = YouTube's ranking).
+ * Deduped against the library (already have it) and against the existing pool
+ * (unique videoId). Returns the count of genuinely new rows.
+ */
+export function ingestRecommended(items: IngestItem[], opts: IngestOptions = {}): number {
+	if (!items.length) return 0;
+	const ids = items.map((i) => i.videoId);
+
+	const inLibrary = new Set(
+		db.select({ v: videos.videoId }).from(videos).where(inArray(videos.videoId, ids)).all().map((r) => r.v)
+	);
+	const inPool = new Set(
+		db.select({ v: recommendations.videoId }).from(recommendations).where(inArray(recommendations.videoId, ids)).all().map((r) => r.v)
+	);
+
+	let added = 0;
+	items.forEach((it, rank) => {
+		if (inLibrary.has(it.videoId) || inPool.has(it.videoId)) return;
+		db.insert(recommendations)
+			.values({
+				videoId: it.videoId,
+				title: it.title,
+				channelName: it.channelName,
+				channelId: it.channelId,
+				thumbnailUrl: it.thumbnailUrl,
+				durationSeconds: it.durationSeconds,
+				badges: it.badges ?? null,
+				source: opts.source ?? 'home',
+				sourceVideoId: opts.sourceVideoId ?? null,
+				rank
+			})
+			.onConflictDoNothing()
+			.run();
+		added++;
+	});
+	return added;
+}
+
+export interface DiscoverCard {
+	id: number;
+	videoId: string;
+	title: string;
+	channelName: string | null;
+	thumbnailUrl: string | null;
+	durationSeconds: number | null;
+	source: Recommendation['source'];
+}
+
+/**
+ * A page of the pool: newest first, only still-actionable ('new') items. Uses an
+ * id cursor (`beforeId`) rather than offset so pagination stays stable as items
+ * are grabbed/dismissed out of the pool. id is monotonic with insertion order.
+ */
+export function listRecommendations(opts: { limit?: number; beforeId?: number } = {}): DiscoverCard[] {
+	const limit = Math.min(100, Math.max(1, opts.limit ?? 48));
+	const conds = [eq(recommendations.status, 'new')];
+	if (opts.beforeId && opts.beforeId > 0) conds.push(lt(recommendations.id, opts.beforeId));
+	return db
+		.select({
+			id: recommendations.id,
+			videoId: recommendations.videoId,
+			title: recommendations.title,
+			channelName: recommendations.channelName,
+			thumbnailUrl: recommendations.thumbnailUrl,
+			durationSeconds: recommendations.durationSeconds,
+			source: recommendations.source
+		})
+		.from(recommendations)
+		.where(and(...conds))
+		.orderBy(desc(recommendations.id))
+		.limit(limit)
+		.all();
+}
+
+export function countNewRecommendations(): number {
+	return (
+		db
+			.select({ n: recommendations.id })
+			.from(recommendations)
+			.where(eq(recommendations.status, 'new'))
+			.all().length
+	);
+}
+
+/** Grab (download) a pooled recommendation, optionally into Watch Later. */
+export function grabRecommendation(id: number, watchLater = false): void {
+	const rec = db.select().from(recommendations).where(eq(recommendations.id, id)).get();
+	if (!rec) return;
+	enqueueDownload({
+		videoId: rec.videoId,
+		title: rec.title,
+		channelId: rec.channelId,
+		channelName: rec.channelName,
+		thumbnailUrl: rec.thumbnailUrl,
+		durationSeconds: rec.durationSeconds,
+		addToWatchLater: watchLater
+	});
+	db.update(recommendations).set({ status: 'downloaded' }).where(eq(recommendations.id, id)).run();
+}
+
+export function dismissRecommendation(id: number): void {
+	db.update(recommendations).set({ status: 'dismissed' }).where(eq(recommendations.id, id)).run();
+}
