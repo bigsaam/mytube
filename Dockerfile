@@ -39,6 +39,9 @@ RUN pnpm run build \
 ############################### chromium (optional) ######################
 # Isolated stage so the browser + its apt deps never touch the default image.
 FROM build AS chromium
+# Install into /ms-playwright (not the default ~/.cache) so the runtime-chromium
+# stage can COPY it from a fixed, predictable path.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN pnpm exec playwright install --with-deps chromium
 
 ############################### runtime ###################################
