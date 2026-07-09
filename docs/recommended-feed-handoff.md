@@ -50,8 +50,16 @@ The same `cookies.txt` also feeds yt-dlp (`--cookies`) for age-gated/members vid
   default has no browser). CI (`.github/workflows/docker.yml`) publishes both.
 - **DB:** migration `0005_deep_cargill.sql` added the `recommendations` pool table.
 - **Deploy flow:** push `main` → CI builds `:latest` + `:chromium` → ask the
-  homelab agent (`clideck ask --session @homelab/mytube-deployment`) to
-  `docker compose pull && up -d` (it tracks `:chromium`).
+  homelab deployment agent over **Paseo** to `docker compose pull && up -d`
+  (it tracks `:chromium`):
+  ```bash
+  paseo ls -g                       # find the `mytube-deployment` agent id
+  paseo send <agent-id> "<deploy request>"   # blocks until it replies
+  ```
+  ⚠️ **Prod self-updates.** Watchtower watches the rolling `:chromium` tag, so a
+  push to `main` deploys itself once CI publishes — and any DB migration
+  auto-applies on that pull, deploy request or not. Pin `:sha-<commit>-chromium`
+  if you want deploys to be the only thing that moves prod.
 
 ### Module map (recommended feed)
 
