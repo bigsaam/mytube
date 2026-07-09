@@ -43,6 +43,13 @@
       "when": 1783543122329,
       "tag": "0005_deep_cargill",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1783635253395,
+      "tag": "0006_migrate_legacy_recommended",
+      "breakpoints": true
     }
   ]
 }

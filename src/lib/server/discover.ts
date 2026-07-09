@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { and, desc, eq, inArray, lt } from 'drizzle-orm';
+import { and, desc, eq, inArray, lt, sql } from 'drizzle-orm';
 import { db } from './db';
 import { recommendations, videos, jobs, type Recommendation } from './db/schema';
 import { enqueueDownload } from './downloads';
@@ -102,13 +102,14 @@ export function listRecommendations(opts: { limit?: number; beforeId?: number } 
 		.all();
 }
 
+/** Unread-style count for the Discover sidebar badge. */
 export function countNewRecommendations(): number {
 	return (
 		db
-			.select({ n: recommendations.id })
+			.select({ n: sql<number>`count(*)` })
 			.from(recommendations)
 			.where(eq(recommendations.status, 'new'))
-			.all().length
+			.get()?.n ?? 0
 	);
 }
 

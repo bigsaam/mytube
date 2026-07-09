@@ -23,7 +23,7 @@
 {#if form?.error}<p class="mb-4 rounded-md bg-red-950 px-3 py-2 text-sm text-red-300">{form.error}</p>{/if}
 {#if form?.cookiesSaved}<p class="mb-4 rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">Cookies saved.</p>{/if}
 {#if form?.saved}<p class="mb-4 rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">Saved.</p>{/if}
-{#if form?.scraping}<p class="mb-4 rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">Scrape queued — check the Feed shortly.</p>{/if}
+{#if form?.scraping}<p class="mb-4 rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">Scrape queued — check <a href="/discover" class="underline">Discover</a> shortly.</p>{/if}
 
 <!-- Status banner -->
 <div class="mb-6 flex items-center gap-3 rounded-lg px-4 py-3 {statusColor}">

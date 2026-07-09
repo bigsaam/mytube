@@ -3,14 +3,14 @@
 	import Icon from './Icon.svelte';
 
 	interface Props {
-		counts?: { feed: number; watchLater: number; downloads: number };
+		counts?: { feed: number; discover: number; watchLater: number; downloads: number };
 		showLogout?: boolean;
 	}
 	let { counts, showLogout = false }: Props = $props();
 
 	let nav = $derived([
 		{ href: '/feed', label: 'Feed', icon: 'feed', badge: counts?.feed },
-		{ href: '/discover', label: 'Discover', icon: 'discover', badge: 0 },
+		{ href: '/discover', label: 'Discover', icon: 'discover', badge: counts?.discover },
 		{ href: '/watch-later', label: 'Watch Later', icon: 'watch-later', badge: counts?.watchLater },
 		{ href: '/library', label: 'Library', icon: 'library', badge: 0 },
 		{ href: '/channels', label: 'Channels', icon: 'channels', badge: 0 },

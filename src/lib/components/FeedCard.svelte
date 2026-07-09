@@ -10,7 +10,6 @@
 		durationSeconds?: number | null;
 		thumbnailUrl?: string | null;
 		publishedAt?: Date | string | null;
-		source?: string;
 		onAction: (id: number, action: 'grab' | 'watchLater' | 'dismiss') => void;
 	}
 	let {
@@ -21,7 +20,6 @@
 		durationSeconds,
 		thumbnailUrl,
 		publishedAt,
-		source = 'subscription',
 		onAction
 	}: Props = $props();
 
@@ -52,9 +50,6 @@
 			<span class="absolute bottom-1.5 right-1.5 rounded bg-black/80 px-1.5 py-0.5 text-xs font-medium tabular-nums text-white">
 				{formatDuration(durationSeconds)}
 			</span>
-		{/if}
-		{#if source === 'recommended'}
-			<span class="absolute left-1.5 top-1.5 chip bg-black/70 text-white">Recommended</span>
 		{/if}
 	</a>
 

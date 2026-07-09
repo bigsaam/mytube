@@ -54,7 +54,6 @@
 				durationSeconds={item.durationSeconds}
 				thumbnailUrl={item.thumbnailUrl}
 				publishedAt={item.publishedAt}
-				source={item.source}
 				{onAction}
 			/>
 		{/each}
