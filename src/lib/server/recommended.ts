@@ -26,6 +26,16 @@ export interface ExtractOptions {
 	filterMixes?: boolean; // mixes/playlists aren't videoRenderers, so mostly a no-op
 }
 
+const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
+const SHORTS_ENTITY_PREFIX = 'shorts-shelf-item-';
+
+/**
+ * Item shapes YouTube uses, newest first. The home feed migrated from
+ * `videoRenderer` to the `*ViewModel` family; other surfaces still emit the
+ * old shape, so we parse all of them and preserve document order (= ranking).
+ */
+const FEED_ITEM_KEYS = ['videoRenderer', 'lockupViewModel', 'shortsLockupViewModel'];
+
 /** Parse ytInitialData (or a browse continuation response) into items. */
 export function extractRecommended(
 	data: unknown,
@@ -34,12 +44,17 @@ export function extractRecommended(
 	const root = typeof data === 'string' ? safeJson(data) : data;
 	if (!root || typeof root !== 'object') return [];
 
-	const renderers = collectByKey(root as Record<string, unknown>, 'videoRenderer');
+	const nodes = collectByKeys(root as Record<string, unknown>, FEED_ITEM_KEYS);
 	const items: RecommendedItem[] = [];
 	const seen = new Set<string>();
 
-	for (const vr of renderers) {
-		const item = parseVideoRenderer(vr);
+	for (const { key, node } of nodes) {
+		const item =
+			key === 'videoRenderer'
+				? parseVideoRenderer(node)
+				: key === 'lockupViewModel'
+					? parseLockupViewModel(node)
+					: parseShortsLockupViewModel(node);
 		if (!item || seen.has(item.videoId)) continue;
 
 		if (opts.filterShorts && item.isShort) continue;
@@ -49,6 +64,127 @@ export function extractRecommended(
 		items.push(item);
 	}
 	return items;
+}
+
+/**
+ * Parse the modern home-feed item. Returns null for anything that isn't a plain
+ * video — notably **sponsored items**, which YouTube injects as lockups carrying
+ * `feedAdMetadataViewModel`. An ad-free library must never ingest those.
+ */
+export function parseLockupViewModel(lv: Record<string, unknown>): RecommendedItem | null {
+	const meta = obj(lv.metadata);
+	if (meta?.feedAdMetadataViewModel) return null; // advertisement
+	const lm = obj(meta?.lockupMetadataViewModel);
+	if (!lm) return null;
+
+	// Ads omit contentType; playlists/mixes/channels use other values.
+	const contentType = str(lv.contentType);
+	if (contentType && contentType !== 'LOCKUP_CONTENT_TYPE_VIDEO') return null;
+
+	const videoId = str(lv.contentId);
+	if (!videoId || !VIDEO_ID_RE.test(videoId)) return null;
+
+	const title = str(obj(lm.title)?.content) ?? videoId;
+
+	// metadataRows[0] = channel (with a browseEndpoint); [1] = views · published.
+	const rows = asArray(obj(obj(lm.metadata)?.contentMetadataViewModel)?.metadataRows);
+	const firstPart = obj(asArray(obj(rows[0])?.metadataParts)[0]);
+	const channelName = str(obj(firstPart?.text)?.content);
+	const channelId = browseIdFromCommandRuns(obj(firstPart?.text)?.commandRuns);
+
+	const thumb = obj(obj(lv.contentImage)?.thumbnailViewModel);
+	const badges = thumbnailBadges(thumb);
+	const isLive = badges.some((b) => /LIVE/i.test(b.style) || /^live$/i.test(b.text));
+	const isUpcoming = badges.some((b) => /UPCOMING/i.test(b.style));
+	const isMembersOnly = badges.some((b) => /member/i.test(b.text));
+	const durationSeconds =
+		isLive || isUpcoming ? null : (badges.map((b) => parseClock(b.text)).find((n) => n != null) ?? null);
+
+	return {
+		videoId,
+		title,
+		channelName,
+		channelId,
+		durationSeconds,
+		thumbnailUrl: bestSource(thumb) ?? fallbackThumb(videoId),
+		isLive,
+		isUpcoming,
+		isShort: false,
+		isMembersOnly,
+		badges: badges.map((b) => b.text).filter(Boolean)
+	};
+}
+
+/** Shorts shelf items. Marked `isShort` so the existing filter can drop them. */
+export function parseShortsLockupViewModel(sl: Record<string, unknown>): RecommendedItem | null {
+	const cmd = obj(obj(sl.onTap)?.innertubeCommand);
+	// NB: strip the known prefix rather than splitting on '-' — video ids may
+	// legally contain '-' and '_'.
+	const entityId = str(sl.entityId);
+	const fromEntity = entityId?.startsWith(SHORTS_ENTITY_PREFIX)
+		? entityId.slice(SHORTS_ENTITY_PREFIX.length)
+		: null;
+	const videoId =
+		str(obj(cmd?.reelWatchEndpoint)?.videoId) ?? str(obj(cmd?.watchEndpoint)?.videoId) ?? fromEntity;
+	if (!videoId || !VIDEO_ID_RE.test(videoId)) return null;
+
+	const thumb = obj(sl.thumbnailViewModel);
+	return {
+		videoId,
+		title: str(obj(obj(sl.overlayMetadata)?.primaryText)?.content) ?? videoId,
+		channelName: null,
+		channelId: null,
+		durationSeconds: null,
+		thumbnailUrl: bestSource(thumb) ?? fallbackThumb(videoId),
+		isLive: false,
+		isUpcoming: false,
+		isShort: true,
+		isMembersOnly: false,
+		badges: ['SHORTS']
+	};
+}
+
+/* ------------------------------------------------- view-model value helpers */
+
+function fallbackThumb(videoId: string): string {
+	return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+}
+
+/** Highest-resolution thumbnail from a thumbnailViewModel (sources ascend). */
+function bestSource(thumb: Record<string, unknown> | null): string | null {
+	const sources = asArray(obj(thumb?.image)?.sources);
+	return str(obj(sources[sources.length - 1])?.url);
+}
+
+interface ThumbBadge {
+	text: string;
+	style: string;
+}
+/** Overlay badges carry duration ("21:51") and live/upcoming styles. */
+function thumbnailBadges(thumb: Record<string, unknown> | null): ThumbBadge[] {
+	const out: ThumbBadge[] = [];
+	for (const overlay of asArray(thumb?.overlays)) {
+		const bottom = obj(obj(overlay)?.thumbnailBottomOverlayViewModel);
+		for (const b of asArray(bottom?.badges)) {
+			const badge = obj(obj(b)?.thumbnailBadgeViewModel);
+			if (!badge) continue;
+			out.push({ text: str(badge.text) ?? '', style: str(badge.badgeStyle) ?? '' });
+		}
+	}
+	return out;
+}
+
+function browseIdFromCommandRuns(commandRuns: unknown): string | null {
+	for (const run of asArray(commandRuns)) {
+		const browse = obj(obj(obj(obj(run)?.onTap)?.innertubeCommand)?.browseEndpoint);
+		const id = str(browse?.browseId);
+		if (id && /^UC/.test(id)) return id;
+	}
+	return null;
+}
+
+function obj(v: unknown): Record<string, unknown> | null {
+	return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
 }
 
 /** Parse a single videoRenderer object into a normalized item. */
@@ -142,12 +278,19 @@ export function summarizeRenderers(counts: Record<string, number>): string {
 
 /* --------------------------------------------------- structural helpers */
 
+export interface KeyedNode {
+	key: string;
+	node: Record<string, unknown>;
+}
+
 /**
- * Deep-walk collecting every object found under `key`, in document order
- * (which is YouTube's ranking — preserve it). Drift-resistant vs fixed paths.
+ * Deep-walk collecting every object found under any of `keys`, in document
+ * order (which is YouTube's ranking — preserve it). Drift-resistant vs fixed
+ * paths: when YouTube renames a wrapper, only the key list changes.
  */
-export function collectByKey(root: unknown, key: string): Record<string, unknown>[] {
-	const out: Record<string, unknown>[] = [];
+export function collectByKeys(root: unknown, keys: string[]): KeyedNode[] {
+	const wanted = new Set(keys);
+	const out: KeyedNode[] = [];
 	const seen = new Set<unknown>();
 	const walk = (node: unknown) => {
 		if (!node || typeof node !== 'object' || seen.has(node)) return;
@@ -157,14 +300,19 @@ export function collectByKey(root: unknown, key: string): Record<string, unknown
 			return;
 		}
 		for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
-			if (k === key && v && typeof v === 'object' && !Array.isArray(v)) {
-				out.push(v as Record<string, unknown>);
+			if (wanted.has(k) && v && typeof v === 'object' && !Array.isArray(v)) {
+				out.push({ key: k, node: v as Record<string, unknown> });
 			}
 			walk(v);
 		}
 	};
 	walk(root);
 	return out;
+}
+
+/** Single-key convenience wrapper over {@link collectByKeys}. */
+export function collectByKey(root: unknown, key: string): Record<string, unknown>[] {
+	return collectByKeys(root, [key]).map((m) => m.node);
 }
 
 function lengthSeconds(vr: Record<string, unknown>): number | null {
