@@ -29,6 +29,11 @@ export interface EnqueueJobOptions {
 /**
  * Enqueue a job. When `dedupeKey` is given and a non-terminal job with that key
  * already exists, this is a no-op (prevents piling up duplicate RSS polls etc).
+ *
+ * Terminal (done/failed) rows KEEP their dedupe key for history and must never
+ * block a re-enqueue — otherwise a recurring job runs exactly once. That's what
+ * `uq_jobs_dedupe_pending` (a *partial* unique index over queued/active rows)
+ * guarantees; `onConflictDoNothing` below only absorbs a genuine race.
  */
 export function enqueueJob(
 	type: JobType,
@@ -52,6 +57,7 @@ export function enqueueJob(
 			priority: opts.priority ?? 0,
 			maxAttempts: opts.maxAttempts ?? 3
 		})
+		.onConflictDoNothing()
 		.run();
 }
 

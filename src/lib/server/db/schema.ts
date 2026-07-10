@@ -209,7 +209,8 @@ export const jobs = sqliteTable(
 		maxAttempts: integer('max_attempts').notNull().default(3),
 		runAfter: integer('run_after', { mode: 'timestamp_ms' }).notNull().default(now),
 		error: text('error'),
-		// Optional idempotency key to avoid piling up duplicate jobs.
+		// Optional idempotency key: at most one PENDING job may hold a given key.
+		// Terminal rows keep their key for history — see the partial index below.
 		dedupeKey: text('dedupe_key'),
 		createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().default(now),
 		startedAt: integer('started_at', { mode: 'timestamp_ms' }),
@@ -218,7 +219,14 @@ export const jobs = sqliteTable(
 	(t) => ({
 		byStatus: index('idx_jobs_status').on(t.status),
 		byRunAfter: index('idx_jobs_runafter').on(t.runAfter),
-		uqDedupe: uniqueIndex('uq_jobs_dedupe').on(t.dedupeKey)
+		// PARTIAL unique index. The invariant is "at most one *pending* job per
+		// dedupe key" — not "one ever". A plain UNIQUE across all rows meant a
+		// completed job kept its key forever, so every recurring enqueue (RSS
+		// polls, playlist_sync, recommended_scrape, cleanup) threw
+		// SQLITE_CONSTRAINT_UNIQUE and the scheduler tick died.
+		uqDedupePending: uniqueIndex('uq_jobs_dedupe_pending')
+			.on(t.dedupeKey)
+			.where(sql`status in ('queued', 'active')`)
 	})
 );
 

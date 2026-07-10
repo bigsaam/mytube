@@ -37,13 +37,23 @@ export function startWorkers() {
 	const timers: NodeJS.Timeout[] = [];
 	timers.push(safeInterval(downloadsTick, DOWNLOAD_TICK_MS, 'downloads'));
 	timers.push(safeInterval(jobsTick, JOB_TICK_MS, 'jobs'));
+	// Each scheduler is isolated: one that throws must not starve the ones after
+	// it. (A UNIQUE-constraint throw in schedulePlaylistSync silently prevented
+	// scheduleRecommended + scheduleMaintenance from EVER running on prod.)
+	const guarded = (name: string, fn: () => void) => {
+		try {
+			fn();
+		} catch (err) {
+			console.error(`[worker:scheduler:${name}]`, err);
+		}
+	};
 	timers.push(
 		safeInterval(
 			() => {
-				scheduleDuePolls();
-				schedulePlaylistSync();
-				scheduleRecommended();
-				scheduleMaintenance();
+				guarded('duePolls', scheduleDuePolls);
+				guarded('playlistSync', schedulePlaylistSync);
+				guarded('recommended', scheduleRecommended);
+				guarded('maintenance', scheduleMaintenance);
 			},
 			SCHEDULER_TICK_MS,
 			'scheduler'

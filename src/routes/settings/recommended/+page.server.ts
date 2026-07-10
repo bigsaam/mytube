@@ -29,10 +29,14 @@ export const actions: Actions = {
 		}
 		const text = await file.text();
 		if (!/youtube\.com/i.test(text)) {
+			console.warn(`[cookies] rejected upload (${file.size}B): no youtube.com entries`);
 			return fail(422, { error: "That doesn't look like a YouTube cookies.txt export." });
 		}
 		fs.mkdirSync(config.dataRoot, { recursive: true });
 		fs.writeFileSync(config.cookiesPath, text, { mode: 0o600 });
+		// The app logs no HTTP requests, so without this an upload that never
+		// arrives is indistinguishable from one that silently failed to persist.
+		console.log(`[cookies] saved ${text.length}B → ${config.cookiesPath}`);
 		setSetting('cookiesUploadedAt', Date.now());
 		// A fresh cookie file clears any "needs attention" state.
 		setSetting('recommendedStatus', 'ok');
