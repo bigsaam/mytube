@@ -16,6 +16,10 @@
 		 * pooled recommendations are disposable. Omit it and the button is absent.
 		 */
 		onWatchNow?: (id: number) => void;
+		/** Hide this video and block its channel. Discover-only, like onWatchNow. */
+		onNotInterested?: (id: number) => void;
+		/** Seed the pool from this video's related rail. Discover-only. */
+		onMoreLikeThis?: (id: number, videoId: string) => void;
 	}
 	let {
 		id,
@@ -26,7 +30,9 @@
 		thumbnailUrl,
 		publishedAt,
 		onAction,
-		onWatchNow
+		onWatchNow,
+		onNotInterested,
+		onMoreLikeThis
 	}: Props = $props();
 
 	let busy = $state(false);
@@ -39,6 +45,15 @@
 		if (busy) return;
 		busy = true;
 		onWatchNow?.(id);
+	}
+	function notInterested() {
+		if (busy) return;
+		busy = true;
+		onNotInterested?.(id);
+	}
+	// Doesn't remove the card — it *adds* to the pool, so the card stays put.
+	function moreLikeThis() {
+		onMoreLikeThis?.(id, videoId);
 	}
 
 	let published = $derived(publishedAt ? new Date(publishedAt) : null);
@@ -88,8 +103,18 @@
 		<button class="btn-ghost py-1.5 text-xs" onclick={() => act('watchLater')} disabled={busy} title="Grab + Watch Later">
 			<Icon name="watch-later" size={14} />
 		</button>
+		{#if onMoreLikeThis}
+			<button class="btn-ghost py-1.5 text-xs" onclick={moreLikeThis} disabled={busy} title="More like this — pull this video's recommendations into Discover">
+				<Icon name="discover" size={14} />
+			</button>
+		{/if}
 		<button class="btn-ghost py-1.5 text-xs" onclick={() => act('dismiss')} disabled={busy} title="Dismiss">
 			<Icon name="x" size={14} />
 		</button>
+		{#if onNotInterested}
+			<button class="btn-ghost py-1.5 text-xs" onclick={notInterested} disabled={busy} title="Not interested — hide this and stop showing this channel">
+				<Icon name="block" size={14} />
+			</button>
+		{/if}
 	</div>
 </div>

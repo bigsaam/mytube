@@ -6,7 +6,7 @@ import { enqueueHistorySync, runHistorySync } from './history-sync';
 import { syncPlaylist, removeFromPlaylist, enqueuePlaylistRemove } from './playlist-sync';
 import { setDownloadedHook } from './downloads';
 import { backfillVideo } from './backfill';
-import { requestUpnextScrape } from './discover';
+import { requestUpnextScrape, expireStaleRecommendations } from './discover';
 import { getSettings } from './settings';
 
 /**
@@ -32,6 +32,8 @@ export function registerJobHandlers(): void {
 
 	registerJobHandler('cleanup', async () => {
 		runCleanupSweep();
+		// Keep Discover current: drop untouched pool rows that have gone stale.
+		expireStaleRecommendations();
 	});
 
 	registerJobHandler('recommended_scrape', async () => {

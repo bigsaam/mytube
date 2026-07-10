@@ -49,6 +49,9 @@ export interface AppSettings {
 	recommendedFilterMixes: boolean;
 	recommendedFilterLive: boolean;
 	recommendedPollsPerDay: number;
+	// Untouched 'new' pool rows are pruned after this many days, so Discover shows
+	// current recommendations rather than an archaeology dig. 0 disables expiry.
+	recommendedExpiryDays: number;
 	// Health state surfaced as a Settings banner.
 	recommendedStatus: 'ok' | 'needs_attention' | 'never_run';
 	recommendedMessage: string;
@@ -88,6 +91,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
 	recommendedFilterMixes: true,
 	recommendedFilterLive: true,
 	recommendedPollsPerDay: 3,
+	recommendedExpiryDays: 14,
 	recommendedStatus: 'never_run',
 	recommendedMessage: '',
 

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
 	formatDuration,
 	formatBytes,
@@ -26,10 +26,18 @@ describe('formatCount', () => {
 });
 
 describe('formatUntil', () => {
+	// formatUntil reads Date.now() itself, so with a real clock the microseconds
+	// between building the argument and reading it make `+3d` land just under
+	// three days — Math.floor then reports "in 2d" and the test flakes. Freeze time.
+	afterEach(() => vi.useRealTimers());
+
 	it('describes a future date and marks past ones expired', () => {
-		expect(formatUntil(Date.now() + 3 * 86400_000)).toBe('in 3d');
-		expect(formatUntil(Date.now() + 2 * 3600_000)).toBe('in 2h');
-		expect(formatUntil(Date.now() - 1000)).toBe('expired');
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+		const now = Date.now();
+		expect(formatUntil(now + 3 * 86400_000)).toBe('in 3d');
+		expect(formatUntil(now + 2 * 3600_000)).toBe('in 2h');
+		expect(formatUntil(now - 1000)).toBe('expired');
 		expect(formatUntil(null)).toBe('');
 	});
 });

@@ -8,9 +8,11 @@ import { extractRecommended } from './recommended';
  *
  *  1. The rail is `lockupViewModel`, NOT `compactVideoRenderer` — the watch page
  *     has migrated off the legacy renderer entirely.
- *  2. Watch-page lockups carry no `commandRuns`, so there is no channelId to
- *     recover. Home-feed lockups do. Anything keyed on channelId (a per-channel
- *     blocklist, channel-diversity ranking) must tolerate null here.
+ *  2. Watch-page lockups carry no `commandRuns` on the metadata text — but they
+ *     DO expose the channel's browseId on the avatar
+ *     (`lockupMetadataViewModel.image.decoratedAvatarViewModel`). Home-feed
+ *     lockups use commandRuns. The parser tries both, so a per-channel blocklist
+ *     works on either surface without any extra network lookup.
  *
  * Ads reach this rail via `adSlotRenderer` wrapping a lockup with a real
  * contentId, an empty `lockupMetadataViewModel`, and `feedAdMetadataViewModel`
@@ -20,6 +22,8 @@ import { extractRecommended } from './recommended';
  * copied from a real capture.
  */
 
+const CHANNEL_ID = 'UCN0nCULM7jKvqmZ0EROkJxA';
+
 const relatedLockup = (id: string, title: string) => ({
 	lockupViewModel: {
 		contentId: id,
@@ -27,6 +31,16 @@ const relatedLockup = (id: string, title: string) => ({
 		metadata: {
 			lockupMetadataViewModel: {
 				title: { content: title },
+				// The only place a watch-page lockup exposes the channelId.
+				image: {
+					decoratedAvatarViewModel: {
+						rendererContext: {
+							commandContext: {
+								onTap: { innertubeCommand: { browseEndpoint: { browseId: CHANNEL_ID } } }
+							}
+						}
+					}
+				},
 				metadata: {
 					contentMetadataViewModel: {
 						metadataRows: [
@@ -109,8 +123,15 @@ describe('watch-page up-next rail', () => {
 		expect(items[0].durationSeconds).toBe(38 * 60 + 58);
 	});
 
-	it('yields a null channelId (watch lockups carry no commandRuns)', () => {
+	it('recovers channelId from the avatar when commandRuns is absent', () => {
 		const items = extractRecommended(watchPage([relatedLockup('gj5OlwtFe5M', 'x')]), {});
+		expect(items[0].channelId).toBe(CHANNEL_ID);
+	});
+
+	it('still yields null channelId when neither source is present', () => {
+		const lockup = relatedLockup('gj5OlwtFe5M', 'x');
+		delete (lockup.lockupViewModel.metadata.lockupMetadataViewModel as Record<string, unknown>).image;
+		const items = extractRecommended(watchPage([lockup]), {});
 		expect(items[0].channelId).toBeNull();
 	});
 

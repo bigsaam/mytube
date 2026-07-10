@@ -312,6 +312,30 @@ export const recommendations = sqliteTable(
 	})
 );
 
+/* ---------------------------------------------------------- blocked channels */
+/**
+ * Channels the user hit "Not interested" on. `ingestRecommended` drops their
+ * videos before they ever reach the pool.
+ *
+ * `channelId` is the durable key and is present for ~97% of pooled items (both
+ * home and watch-page lockups expose it, in different places — see
+ * recommended.ts). The handful that don't are blocked by `channelName`, which is
+ * a display string and therefore best-effort: it can change, and two channels
+ * can share one. Hence both columns, and both are matched at ingest.
+ */
+export const blockedChannels = sqliteTable(
+	'blocked_channels',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		channelId: text('channel_id').unique(),
+		channelName: text('channel_name'),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().default(now)
+	},
+	(t) => ({
+		byName: index('idx_blocked_name').on(t.channelName)
+	})
+);
+
 /* ------------------------------------------------------------------ settings */
 // Simple typed key/value store. Values are JSON-encoded text.
 export const settings = sqliteTable('settings', {

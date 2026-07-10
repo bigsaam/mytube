@@ -56,6 +56,45 @@
 		}
 	}
 
+	/**
+	 * "Not interested": drop the card, and drop every other card from the same
+	 * channel — the server blocks the channel, so leaving its siblings on screen
+	 * would just be a lie the next reload corrects.
+	 */
+	async function onNotInterested(id: number) {
+		const gone = items.find((i) => i.id === id);
+		const channel = gone?.channelName ?? null;
+		items = items.filter((i) => i.id !== id && !(channel && i.channelName === channel));
+		try {
+			const res = await fetch('/api/recommended', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ id, action: 'notInterested' })
+			});
+			if (!res.ok) throw new Error();
+			flash(channel ? `Hidden — no more from ${channel}` : 'Hidden');
+		} catch {
+			flash('Something went wrong');
+		}
+	}
+
+	/** Seed the pool from this card's related rail. Rate-capped server-side. */
+	async function onMoreLikeThis(id: number, videoId: string) {
+		try {
+			const res = await fetch('/api/recommended', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ id, videoId, action: 'moreLikeThis' })
+			});
+			const body = (await res.json()) as { status: string; message: string };
+			flash(body.message);
+			// The scrape is async (Playwright ~20s); pull the fuller pool afterwards.
+			if (body.status === 'queued') setTimeout(() => invalidateAll(), 25_000);
+		} catch {
+			flash('Could not fetch more like this');
+		}
+	}
+
 	let refreshing = $state(false);
 	async function refresh() {
 		if (refreshing) return;
@@ -121,6 +160,8 @@
 				thumbnailUrl={item.thumbnailUrl}
 				{onAction}
 				{onWatchNow}
+				{onNotInterested}
+				{onMoreLikeThis}
 			/>
 		{/each}
 	</div>

@@ -25,6 +25,30 @@
 {#if form?.saved}<p class="mb-4 rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">Saved.</p>{/if}
 {#if form?.scraping}<p class="mb-4 rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">Scrape queued — check <a href="/discover" class="underline">Discover</a> shortly.</p>{/if}
 
+<!--
+	The flywheel: watching here pings YouTube history → YouTube keeps personalising
+	→ the next scrape pulls better recommendations. Only worth nudging when the feed
+	is on and history sync is off. It's an env var, so there's no switch to offer —
+	say where it lives rather than implying one exists.
+-->
+{#if data.flags.recommendedFeedEnabled && !data.flags.historySyncEnabled}
+	<div class="mb-6 flex items-start gap-3 rounded-lg bg-bg-raised px-4 py-3 text-sm">
+		<Icon name="warning" size={18} class="mt-0.5 shrink-0 text-fg-muted" />
+		<div>
+			<p class="font-medium">Your recommendations aren’t learning from what you watch.</p>
+			<p class="mt-1 text-fg-muted">
+				With <code class="rounded bg-bg px-1">HISTORY_SYNC_ENABLED=true</code>, marking a video watched here
+				pings your YouTube history, so the next scrape comes back better tuned. Set it in your environment
+				and restart.
+			</p>
+			<p class="mt-1 text-fg-faint">
+				This improves your feed only. A history ping serves no ad, so it earns the creator nothing — watch or
+				share on YouTube for that.
+			</p>
+		</div>
+	</div>
+{/if}
+
 <!-- Status banner -->
 <div class="mb-6 flex items-center gap-3 rounded-lg px-4 py-3 {statusColor}">
 	<Icon name={s.recommendedStatus === 'needs_attention' ? 'warning' : 'feed'} size={18} />
@@ -73,6 +97,13 @@
 					<label class="mt-2 flex items-center justify-between gap-4">
 						<span>Scrapes per day</span>
 						<input type="number" name="pollsPerDay" min="2" max="4" value={s.recommendedPollsPerDay} class="input w-20" />
+					</label>
+					<label class="flex items-center justify-between gap-4">
+						<span>
+							Expire unseen items after
+							<span class="block text-xs text-fg-faint">days; 0 keeps them forever</span>
+						</span>
+						<input type="number" name="expiryDays" min="0" max="365" value={s.recommendedExpiryDays} class="input w-20" />
 					</label>
 				</div>
 				<div class="mt-4 flex gap-2">

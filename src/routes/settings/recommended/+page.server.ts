@@ -56,7 +56,9 @@ export const actions: Actions = {
 			recommendedFilterShorts: form.get('filterShorts') != null,
 			recommendedFilterMixes: form.get('filterMixes') != null,
 			recommendedFilterLive: form.get('filterLive') != null,
-			recommendedPollsPerDay: Math.min(4, Math.max(2, Number(form.get('pollsPerDay')) || 3))
+			recommendedPollsPerDay: Math.min(4, Math.max(2, Number(form.get('pollsPerDay')) || 3)),
+			// 0 = never expire. Guard against a stray negative wiping the pool.
+			recommendedExpiryDays: Math.min(365, Math.max(0, Number(form.get('expiryDays')) || 0))
 		});
 		return { saved: true };
 	},

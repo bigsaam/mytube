@@ -90,7 +90,11 @@ export function parseLockupViewModel(lv: Record<string, unknown>): RecommendedIt
 	const rows = asArray(obj(obj(lm.metadata)?.contentMetadataViewModel)?.metadataRows);
 	const firstPart = obj(asArray(obj(rows[0])?.metadataParts)[0]);
 	const channelName = str(obj(firstPart?.text)?.content);
-	const channelId = browseIdFromCommandRuns(obj(firstPart?.text)?.commandRuns);
+	// Home-feed lockups carry the channel's browseEndpoint on the metadata text's
+	// `commandRuns`. Watch-page ("up next") lockups do NOT — but they hang the same
+	// browseId off the channel avatar. Try both before giving up.
+	const channelId =
+		browseIdFromCommandRuns(obj(firstPart?.text)?.commandRuns) ?? browseIdFromAvatar(lm);
 
 	const thumb = obj(obj(lv.contentImage)?.thumbnailViewModel);
 	const badges = thumbnailBadges(thumb);
@@ -181,6 +185,16 @@ function browseIdFromCommandRuns(commandRuns: unknown): string | null {
 		if (id && /^UC/.test(id)) return id;
 	}
 	return null;
+}
+
+/** Watch-page lockups hide the channel browseId on the avatar, not the text. */
+function browseIdFromAvatar(lockupMetadata: Record<string, unknown> | null): string | null {
+	const avatar = obj(obj(lockupMetadata?.image)?.decoratedAvatarViewModel);
+	const browse = obj(
+		obj(obj(obj(obj(avatar?.rendererContext)?.commandContext)?.onTap)?.innertubeCommand)?.browseEndpoint
+	);
+	const id = str(browse?.browseId);
+	return id && /^UC/.test(id) ? id : null;
 }
 
 function obj(v: unknown): Record<string, unknown> | null {

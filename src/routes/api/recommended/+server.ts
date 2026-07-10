@@ -1,5 +1,11 @@
 import { json, error } from '@sveltejs/kit';
-import { listRecommendations, grabRecommendation, dismissRecommendation } from '$lib/server/discover';
+import {
+	listRecommendations,
+	grabRecommendation,
+	dismissRecommendation,
+	notInterestedRecommendation,
+	requestUpnextScrape
+} from '$lib/server/discover';
 import type { RequestHandler } from './$types';
 
 /** Paginated pool read for the Discover "load more" (id cursor via ?before=). */
@@ -9,11 +15,12 @@ export const GET: RequestHandler = ({ url }) => {
 	return json({ items: listRecommendations({ beforeId: before, limit }) });
 };
 
-/** Discover card actions: grab / watchLater / watchNow / dismiss. */
+/** Discover card actions: grab / watchLater / watchNow / dismiss / notInterested / moreLikeThis. */
 export const POST: RequestHandler = async ({ request }) => {
 	const body = (await request.json().catch(() => null)) as {
 		id?: number;
-		action?: 'grab' | 'watchLater' | 'watchNow' | 'dismiss';
+		action?: 'grab' | 'watchLater' | 'watchNow' | 'dismiss' | 'notInterested' | 'moreLikeThis';
+		videoId?: string;
 	} | null;
 	const id = Number(body?.id);
 	if (!Number.isFinite(id) || !body?.action) error(400, 'Bad request');
@@ -35,6 +42,17 @@ export const POST: RequestHandler = async ({ request }) => {
 		case 'dismiss':
 			dismissRecommendation(id);
 			break;
+		// Hides the video AND blocks the channel from future ingests.
+		case 'notInterested':
+			notInterestedRecommendation(id);
+			break;
+		// Seed the pool from this video's related rail. Rate-capped server-side, so
+		// report the outcome back rather than pretending it always ran.
+		case 'moreLikeThis': {
+			if (!body.videoId) error(400, 'videoId required');
+			const result = requestUpnextScrape(body.videoId);
+			return json({ ok: result.status === 'queued', ...result });
+		}
 		default:
 			error(400, 'Unknown action');
 	}

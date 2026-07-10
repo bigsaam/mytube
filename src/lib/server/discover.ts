@@ -1,10 +1,11 @@
 import fs from 'node:fs';
-import { and, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lt, or, sql } from 'drizzle-orm';
 import { db } from './db';
-import { recommendations, videos, jobs, type Recommendation } from './db/schema';
+import { recommendations, videos, jobs, blockedChannels, type Recommendation } from './db/schema';
 import { enqueueDownload } from './downloads';
 import { enqueueJob } from './jobs';
 import { config } from './config';
+import { getSettings } from './settings';
 
 /**
  * The "Discover" recommendation pool. Scraped items (see recommended-scraper.ts)
@@ -42,10 +43,12 @@ export function ingestRecommended(items: IngestItem[], opts: IngestOptions = {})
 	const inPool = new Set(
 		db.select({ v: recommendations.videoId }).from(recommendations).where(inArray(recommendations.videoId, ids)).all().map((r) => r.v)
 	);
+	const blocked = loadBlocklist();
 
 	let added = 0;
 	items.forEach((it, rank) => {
 		if (inLibrary.has(it.videoId) || inPool.has(it.videoId)) return;
+		if (isBlocked(blocked, it.channelId, it.channelName)) return;
 		db.insert(recommendations)
 			.values({
 				videoId: it.videoId,
@@ -144,6 +147,96 @@ export function grabRecommendation(id: number, opts: GrabOptions = {}): string |
 
 export function dismissRecommendation(id: number): void {
 	db.update(recommendations).set({ status: 'dismissed' }).where(eq(recommendations.id, id)).run();
+}
+
+/* --------------------------------------------------- not interested / blocklist */
+
+interface Blocklist {
+	ids: Set<string>;
+	names: Set<string>;
+}
+
+/** Channel names are matched case-insensitively; ids exactly. */
+const nameKey = (name: string) => name.trim().toLowerCase();
+
+function loadBlocklist(): Blocklist {
+	const rows = db.select().from(blockedChannels).all();
+	return {
+		ids: new Set(rows.map((r) => r.channelId).filter((v): v is string => !!v)),
+		names: new Set(rows.map((r) => r.channelName).filter((v): v is string => !!v).map(nameKey))
+	};
+}
+
+function isBlocked(list: Blocklist, channelId: string | null, channelName: string | null): boolean {
+	if (channelId && list.ids.has(channelId)) return true;
+	// Name is a fallback for the ~3% of items with no channelId (mostly Shorts).
+	// Best-effort by design: display names change and can collide.
+	if (channelName && list.names.has(nameKey(channelName))) return true;
+	return false;
+}
+
+/**
+ * "Not interested": hide this video AND stop surfacing the channel. Also purges
+ * the channel's other `new` rows from the pool, so the whole channel disappears
+ * from Discover immediately rather than draining one card at a time.
+ *
+ * Blocking a channel we have no id for still works (by name) — but see
+ * `blockedChannels` for why that's best-effort.
+ */
+export function notInterestedRecommendation(id: number): void {
+	const rec = db.select().from(recommendations).where(eq(recommendations.id, id)).get();
+	if (!rec) return;
+
+	db.update(recommendations).set({ status: 'not_interested' }).where(eq(recommendations.id, id)).run();
+	if (!rec.channelId && !rec.channelName) return; // nothing to block on
+
+	// The unique index only covers channelId, so a name-only block would insert a
+	// duplicate row on every click. Check before inserting.
+	if (!isBlocked(loadBlocklist(), rec.channelId, rec.channelName)) {
+		db.insert(blockedChannels)
+			.values({ channelId: rec.channelId, channelName: rec.channelName })
+			.onConflictDoNothing()
+			.run();
+	}
+
+	// Sweep the rest of that channel out of the pool (untouched rows only — never
+	// resurrect or re-status something already grabbed).
+	//
+	// Match on id OR name, exactly as `isBlocked` does. Matching on channelId
+	// alone leaves rows behind: anything ingested before the parser learned to
+	// read the watch-page avatar has a null channelId, so the channel's cards
+	// linger on Discover even though the block itself worked.
+	const matches = [
+		rec.channelId ? eq(recommendations.channelId, rec.channelId) : null,
+		rec.channelName ? sql`lower(trim(${recommendations.channelName})) = ${nameKey(rec.channelName)}` : null
+	].filter((c) => c != null);
+
+	db.update(recommendations)
+		.set({ status: 'not_interested' })
+		.where(and(eq(recommendations.status, 'new'), or(...matches)))
+		.run();
+}
+
+/* ------------------------------------------------------------------- expiry */
+
+/**
+ * Prune untouched pool rows older than `recommendedExpiryDays`. Only `new` rows:
+ * a `downloaded`/`dismissed`/`not_interested` row is a record of a user decision
+ * and must survive, or ingest would happily re-add what they rejected.
+ *
+ * Returns how many rows were deleted. 0 days disables expiry.
+ */
+export function expireStaleRecommendations(): number {
+	const days = getSettings().recommendedExpiryDays;
+	if (!days || days <= 0) return 0;
+	const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+	const res = db
+		.delete(recommendations)
+		.where(and(eq(recommendations.status, 'new'), lt(recommendations.seenAt, cutoff)))
+		.run();
+	const n = res.changes ?? 0;
+	if (n) console.log(`[recommended] expired ${n} stale pool item(s) older than ${days}d`);
+	return n;
 }
 
 /* ------------------------------------------------------- on-demand refresh */

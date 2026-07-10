@@ -1,7 +1,8 @@
 # Recommended feed — build handoff
 
 Status of the "Discover / recommended feed" flywheel and what's left. Pick this
-up cold in a new session. Last updated after **P1c + P2**; only **P3** remains.
+up cold in a new session. Last updated after **P3**. All phases shipped; the
+deferred bits are the channel-diversity cap and the min-duration filter.
 
 ## TL;DR
 
@@ -15,8 +16,8 @@ cookie upload → persistent Chromium profile → logged-in YouTube home →
 | **P1a** | Dedicated `/discover` surface + pool table | ✅ shipped (`4e32a0c`) |
 | **P1b** | On-demand **Refresh** (rate-capped) | ✅ shipped (`6f5b740`) |
 | **P1c** | Stream-and-discard (`ephemeral` videos) | ✅ **shipped** |
-| **P2** | Up-next rabbit hole (watch-page related) | ✅ **shipped & verified** (no UI button yet) |
-| **P3** | Flywheel (history-sync) + quality (diversity/freshness/not-interested) | ⬜ TODO |
+| **P2** | Up-next rabbit hole (watch-page related) | ✅ **shipped & verified** |
+| **P3** | Flywheel (history-sync nudge) + quality (not-interested / expiry) | ✅ **shipped** (diversity cap + min-duration deferred) |
 | **bug** | `continuations=0` — scrapes only ever harvest the first screen | ✅ **fixed & verified** |
 
 ## Hard-won lessons (read before touching the scraper)
@@ -193,28 +194,61 @@ What the original plan got wrong, for the record:
 - **No `compactVideoRenderer` anywhere.** The watch page is 100% `lockupViewModel`
   — the *same* shape as the home feed. **The parser needed zero changes.** Don't
   "extend the parser" for a new surface until you've confirmed it's actually new.
-- Watch-page lockups carry **no `commandRuns`**, hence `channelId` is always
-  `null`. P3's per-channel blocklist / diversity ranking must tolerate that.
+- Watch-page lockups carry **no `commandRuns`** — but they DO expose the channel
+  browseId on the avatar (`…image.decoratedAvatarViewModel`). The parser reads
+  both sources, so the blocklist works on either surface with no extra requests.
 - Ads reach the rail via `adSlotRenderer` nesting a lockup with a real
   `contentId`. It's rejected by `feedAdMetadataViewModel` alone — a lockup with
   no `contentType` is otherwise *accepted*. That marker is load-bearing;
   `recommended.upnext.test.ts` pins it.
 
-Remaining: a per-card **"More like this"** button that calls `requestUpnextScrape`
-on demand (the server side already exists and is rate-capped).
+The per-card **"More like this"** button shipped with P3 and calls
+`requestUpnextScrape` on demand (rate-capped server-side).
 
 Rate caps (`discover.ts`): per-video (`upnext:<id>` dedupe key + skip videos that
 already have `upnext` rows naming them as source) and global
 (`UPNEXT_MAX_PER_HOUR = 6`) — a binge would otherwise fire one scrape per video.
 
-### P3 — flywheel + quality
-- **Flywheel:** ensure `HISTORY_SYNC_ENABLED` is on — watching locally pings
-  YouTube history → better personalization → better scrapes. Surface a Settings
-  nudge (offer to enable it alongside the feed) and document the loop.
-- **Quality:** channel-diversity cap in `listRecommendations` ranking; freshness
-  decay / expiry of stale `new` pool rows (a cleanup pass); **"Not interested"**
-  action (`status='not_interested'` + optional per-channel blocklist that
-  `ingestRecommended` honors); min-duration filter setting.
+### P3 — flywheel + quality ✅ shipped (partially)
+
+**Shipped**
+- **"Not interested"** (`notInterestedRecommendation`): hides the video, blocks
+  the channel, and sweeps that channel's other `new` rows out of the pool.
+- **Channel blocklist** (`blocked_channels`, migration `0009`): honored by
+  `ingestRecommended` before anything reaches the pool.
+- **Stale expiry** (`expireStaleRecommendations`): deletes untouched `new` rows
+  older than `recommendedExpiryDays` (default 14, 0 disables). Runs on the
+  `cleanup` job. **Only `new` rows** — a `downloaded`/`dismissed`/
+  `not_interested` row records a user decision and must survive, or the next
+  scrape re-ingests what they rejected.
+- **"More like this"** per-card button → `requestUpnextScrape` (the P2 leftover).
+- **History-sync nudge** in Settings → Recommended feed, shown when the feed is
+  on and `HISTORY_SYNC_ENABLED` is off. It's an env var, so the nudge explains
+  where to set it rather than pretending there's a toggle. It also states plainly
+  that a history ping earns the creator nothing — it only tunes your feed.
+
+**Deferred:** channel-diversity cap in `listRecommendations` ranking; a
+min-duration filter setting.
+
+#### The channelId question — answered, and it cost a live bug
+
+The plan assumed watch-page items had no channelId and that we'd need a network
+backfill. **Wrong.** Watch-page lockups DO carry it, on the channel avatar
+(`lockupMetadataViewModel.image.decoratedAvatarViewModel…browseEndpoint.browseId`),
+just not on `commandRuns` where home-feed lockups keep it. The parser now reads
+both. **Zero extra requests.** Coverage with production filters: **39/40** on a
+watch page, **21/22** on home. The gap is mostly Shorts, which are filtered out.
+
+So the blocklist keys on `channelId`, with a case/whitespace-insensitive
+`channelName` fallback for the stragglers. Names are display strings — they
+change and collide — so name-blocking is best-effort by design.
+
+**The bug this caused:** rows ingested *before* the avatar fix have a null
+`channelId`. Sweeping the pool on channelId alone left 8 of one channel's 20
+cards sitting on Discover after the user blocked it. The sweep now matches
+id **OR** name, mirroring `isBlocked`. Verified against the real 398-row pool:
+0 left behind, 0 reappeared after a live re-scrape. Regression test:
+`discover.p3.test.ts` → "sweeps siblings that predate channelId extraction".
 
 ## Gotchas
 
