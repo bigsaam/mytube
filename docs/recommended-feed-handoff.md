@@ -5,19 +5,50 @@ up cold in a new session. Last updated after **P1b** (commit `6f5b740`).
 
 ## TL;DR
 
+**The feed is LIVE and working end-to-end on prod** (verified `faf39af`, 2026-07-09):
+cookie upload → persistent Chromium profile → logged-in YouTube home →
+`lockupViewModel` parse → ads rejected → 23 items ingested → `/discover` populated.
+
 | Phase | What | Status |
 |---|---|---|
-| **P0** | Enable it on prod (Chromium image, flag, cookies) | ✅ except **cookies** (your action) |
+| **P0** | Enable it on prod (Chromium image, flag, cookies) | ✅ **done & verified** |
 | **P1a** | Dedicated `/discover` surface + pool table | ✅ shipped (`4e32a0c`) |
 | **P1b** | On-demand **Refresh** (rate-capped) | ✅ shipped (`6f5b740`) |
 | **P1c** | Stream-and-discard (`ephemeral` videos) | ⬜ TODO |
-| **P2** | Up-next rabbit hole (watch-page related) | ⬜ TODO — do **after** real data exists |
+| **P2** | Up-next rabbit hole (watch-page related) | ⬜ TODO |
 | **P3** | Flywheel (history-sync) + quality (diversity/freshness/not-interested) | ⬜ TODO |
+| **bug** | `continuations=0` — scrapes only ever harvest the first screen | ⬜ **TODO, blocks "endless"** |
 
-## ⛳ The one thing gating real recommendations: cookies
+## Hard-won lessons (read before touching the scraper)
 
-The scraper logs into **your** YouTube with your cookies. Until they're uploaded,
-`/discover` is empty (it shows a guided empty state).
+1. **YouTube's home feed no longer emits `videoRenderer`.** It uses
+   `lockupViewModel` (videos) and `shortsLockupViewModel` (Shorts), wrapped in
+   `richItemRenderer`. Fixed in `6130a15`; the legacy shape is still parsed for
+   other surfaces.
+2. **Ads are lockups too.** Sponsored home-feed items are `lockupViewModel`s
+   carrying `feedAdMetadataViewModel` (and no `contentType`). They *must* be
+   rejected or an ad-free library silently starts downloading ads.
+3. **A 0-item scrape is never "ok".** A logged-in home is never empty, so zero
+   items means a silently broken parser. `dbc40b2` makes it `needs_attention` and
+   logs a histogram of the renderer keys actually seen — that one line is the
+   whole drift diagnosis. Check it first.
+4. **`continuations=0`.** The scraper scrolls 3× to pull `/youtubei/v1/browse`
+   continuations, but captures none, so each scrape only harvests the initial
+   page (~23 items). Suspect the scroll fires before the feed is interactive, or
+   the `res.json()` handler races navigation. **This caps pool growth and is the
+   main thing standing between "a feed" and "endless".** Fix before P3.
+5. Settings rows (`recommendedStatus`/`Message`) persist in the DB and are *not*
+   recomputed on boot — a stale `ok` can survive a deploy until the next scrape.
+
+## Cookies (already done, but here's how to re-do it when they rotate)
+
+The scraper logs into **your** YouTube with your cookies. Export them from a
+**browser private/incognito window** (NOT YouTube's own "Incognito mode", which
+signs you out): log in, open a new tab, close the login tab, export with
+*Get cookies.txt LOCALLY* (enable the extension for incognito first), then close
+the window **without signing out**. That session is never reused, so YouTube
+doesn't rotate it out from under MyTube. Upload at *Settings → Recommended feed*.
+Look for `[cookies] saved <n>B → /data/cookies.txt` in the logs to confirm it landed.
 
 1. On your **laptop** (headful browser), install **"Get cookies.txt LOCALLY"**,
    go to youtube.com **logged in**, export `cookies.txt`.
