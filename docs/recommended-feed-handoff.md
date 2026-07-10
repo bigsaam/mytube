@@ -1,14 +1,21 @@
 # Recommended feed — build handoff
 
 Status of the "Discover / recommended feed" flywheel and what's left. Pick this
-up cold in a new session. Last updated after **P3**. All phases shipped; the
-deferred bits are the channel-diversity cap and the min-duration filter.
+up cold in a new session. Last updated after **P3**. **All phases shipped; the
+roadmap is closed.** The channel-diversity cap and min-duration filter were
+considered and deliberately dropped — see P3.
 
 ## TL;DR
 
-**The feed is LIVE and working end-to-end on prod** (verified `faf39af`, 2026-07-09):
-cookie upload → persistent Chromium profile → logged-in YouTube home →
-`lockupViewModel` parse → ads rejected → 23 items ingested → `/discover` populated.
+**The feed is LIVE and working end-to-end on prod.** Cookie upload → persistent
+Chromium profile → logged-in YouTube → `lockupViewModel` parse → ads rejected →
+pool → `/discover`.
+
+Two sources fill the pool: the **home feed** (scheduled 2–4×/day plus manual
+Refresh; ~100–145 items per scrape across 4–6 continuations) and the **up-next
+rail** of whatever you watch (~59 items, rate-capped per video and per hour).
+"Not interested" blocks a channel outright, untouched items expire after 14 days,
+and "Watch now" streams a video then discards it once watched.
 
 | Phase | What | Status |
 |---|---|---|
@@ -17,7 +24,7 @@ cookie upload → persistent Chromium profile → logged-in YouTube home →
 | **P1b** | On-demand **Refresh** (rate-capped) | ✅ shipped (`6f5b740`) |
 | **P1c** | Stream-and-discard (`ephemeral` videos) | ✅ **shipped** |
 | **P2** | Up-next rabbit hole (watch-page related) | ✅ **shipped & verified** |
-| **P3** | Flywheel (history-sync nudge) + quality (not-interested / expiry) | ✅ **shipped** (diversity cap + min-duration deferred) |
+| **P3** | Flywheel (history-sync nudge) + quality (not-interested / expiry) | ✅ **shipped** |
 | **bug** | `continuations=0` — scrapes only ever harvest the first screen | ✅ **fixed & verified** |
 
 ## Hard-won lessons (read before touching the scraper)
@@ -227,8 +234,11 @@ already have `upnext` rows naming them as source) and global
   where to set it rather than pretending there's a toggle. It also states plainly
   that a history ping earns the creator nothing — it only tunes your feed.
 
-**Deferred:** channel-diversity cap in `listRecommendations` ranking; a
-min-duration filter setting.
+**Dropped, not deferred** (decided 2026-07-10): the channel-diversity cap in
+`listRecommendations` ranking, and a min-duration filter setting. Neither is
+pending work — don't resurrect them as TODOs. "Not interested" already handles
+a channel that dominates the pool, and it does so on the user's judgement rather
+than a heuristic. Revisit only if the pool actually feels lopsided in practice.
 
 #### The channelId question — answered, and it cost a live bug
 
