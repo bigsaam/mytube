@@ -192,6 +192,7 @@ export const jobs = sqliteTable(
 				'metadata',
 				'rss_poll',
 				'recommended_scrape',
+				'upnext_scrape',
 				'history_sync',
 				'cleanup',
 				'expire_feed',

@@ -1,11 +1,12 @@
 import { registerJobHandler, pruneJobs } from './jobs';
 import { pollChannel, fillFeedItemDuration, expireOldFeedItems } from './feed';
 import { runCleanupSweep, setWatchedHook } from './lifecycle';
-import { runRecommendedScrape } from './recommended-scraper';
+import { runRecommendedScrape, runUpnextScrape } from './recommended-scraper';
 import { enqueueHistorySync, runHistorySync } from './history-sync';
 import { syncPlaylist, removeFromPlaylist, enqueuePlaylistRemove } from './playlist-sync';
 import { setDownloadedHook } from './downloads';
 import { backfillVideo } from './backfill';
+import { requestUpnextScrape } from './discover';
 import { getSettings } from './settings';
 
 /**
@@ -37,6 +38,11 @@ export function registerJobHandlers(): void {
 		await runRecommendedScrape();
 	});
 
+	registerJobHandler('upnext_scrape', async (payload) => {
+		const videoId = String(payload.videoId ?? '');
+		if (videoId) await runUpnextScrape(videoId);
+	});
+
 	registerJobHandler('history_sync', async (payload) => {
 		const videoId = String(payload.videoId ?? '');
 		if (videoId) await runHistorySync(videoId);
@@ -56,11 +62,13 @@ export function registerJobHandlers(): void {
 		if (videoId) await backfillVideo(videoId);
 	});
 
-	// When a video is marked watched: ping YouTube history, and — only when the
-	// playlist is NOT acting as a pure download queue — remove it from the synced
-	// playlist now. Both self-gate on their own flags too.
+	// When a video is marked watched: ping YouTube history, seed the rabbit hole
+	// from what we just watched, and — only when the playlist is NOT acting as a
+	// pure download queue — remove it from the synced playlist now. Each self-gates
+	// on its own flags; requestUpnextScrape is rate-capped per video and per hour.
 	setWatchedHook((videoId) => {
 		enqueueHistorySync(videoId);
+		requestUpnextScrape(videoId);
 		if (!getSettings().playlistRemoveOnDownload) enqueuePlaylistRemove(videoId);
 	});
 

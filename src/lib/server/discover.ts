@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { and, desc, eq, inArray, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
 import { db } from './db';
 import { recommendations, videos, jobs, type Recommendation } from './db/schema';
 import { enqueueDownload } from './downloads';
@@ -176,4 +176,51 @@ export function requestManualScrape(): RefreshResult {
 	}
 	enqueueJob('recommended_scrape', {}, { dedupeKey: 'recommended_scrape' });
 	return { status: 'queued', message: 'Fetching fresh recommendations — they’ll appear in a moment.' };
+}
+
+/** Up-next scrapes are triggered by watching, so they need a global budget. */
+const UPNEXT_MAX_PER_HOUR = 6;
+
+/**
+ * Queue an up-next scrape seeded by `videoId` (the rabbit hole). Triggered from
+ * the watched hook, so it is capped twice over:
+ *
+ *  - per video: a `upnext:<id>` dedupe key, and we skip videos we already
+ *    harvested (an existing `upnext` row naming it as source);
+ *  - globally: at most UPNEXT_MAX_PER_HOUR jobs an hour, because a binge session
+ *    would otherwise fire one scrape per video watched.
+ *
+ * More scrape surface means more drift and more cookie burn — see the handoff.
+ */
+export function requestUpnextScrape(videoId: string): RefreshResult {
+	if (!config.recommendedFeedEnabled) {
+		return { status: 'disabled', message: 'The recommended feed is disabled.' };
+	}
+	if (!fs.existsSync(config.cookiesPath)) {
+		return { status: 'no_cookies', message: 'Upload your YouTube cookies first.' };
+	}
+
+	// Already mined this video? Its related rail barely moves; don't re-scrape.
+	const harvested = db
+		.select({ id: recommendations.id })
+		.from(recommendations)
+		.where(and(eq(recommendations.source, 'upnext'), eq(recommendations.sourceVideoId, videoId)))
+		.limit(1)
+		.get();
+	if (harvested) {
+		return { status: 'rate_limited', message: 'Already pulled recommendations from this video.' };
+	}
+
+	const since = new Date(Date.now() - 60 * 60 * 1000);
+	const recent = db
+		.select({ n: sql<number>`count(*)` })
+		.from(jobs)
+		.where(and(eq(jobs.type, 'upnext_scrape'), gte(jobs.createdAt, since)))
+		.get();
+	if ((recent?.n ?? 0) >= UPNEXT_MAX_PER_HOUR) {
+		return { status: 'rate_limited', message: 'Up-next scrape budget for this hour is used up.' };
+	}
+
+	enqueueJob('upnext_scrape', { videoId }, { dedupeKey: `upnext:${videoId}` });
+	return { status: 'queued', message: 'Pulling more like this.' };
 }

@@ -15,7 +15,7 @@ cookie upload → persistent Chromium profile → logged-in YouTube home →
 | **P1a** | Dedicated `/discover` surface + pool table | ✅ shipped (`4e32a0c`) |
 | **P1b** | On-demand **Refresh** (rate-capped) | ✅ shipped (`6f5b740`) |
 | **P1c** | Stream-and-discard (`ephemeral` videos) | ⬜ TODO |
-| **P2** | Up-next rabbit hole (watch-page related) | ⬜ TODO |
+| **P2** | Up-next rabbit hole (watch-page related) | ✅ **shipped & verified** (no UI button yet) |
 | **P3** | Flywheel (history-sync) + quality (diversity/freshness/not-interested) | ⬜ TODO |
 | **bug** | `continuations=0` — scrapes only ever harvest the first screen | ✅ **fixed & verified** |
 
@@ -44,14 +44,33 @@ cookie upload → persistent Chromium profile → logged-in YouTube home →
    46 items → 6 / 145**, same cookies and profile.
    - Gate on *scrollability*, not on `ytd-rich-item-renderer` or any other
      YouTube tag name — same drift risk as the parser (lesson 1).
-   - `SCROLL_ROUNDS = 5` is now the **binding limit** (every round lands a
+   - `HOME_SCROLL_ROUNDS = 5` is now the **binding limit** (every round lands a
      continuation; the early-break never fires). Raise it for a deeper pool,
      traded against politeness. It is no longer a bug.
    - **Logged-out YouTube serves no home feed at all** — `scrollHeight ==
      innerHeight`, nothing to scroll. Any scroll/continuation work is
      unverifiable without cookies; a logged-out probe will report 0 and tell you
      nothing.
-5. Settings rows (`recommendedStatus`/`Message`) persist in the DB and are *not*
+5. **A continuation request is not just "the endpoint".** `/youtubei/v1/browse`
+   and `/youtubei/v1/next` are *also* how the page loads itself. Those page-load
+   requests carry **no `continuation` token in the POST body**; the lazy-loaded
+   ones do. Waiting on the bare URL matches the page-load request instantly,
+   reports "got a continuation", and harvests nothing — and it will mask every
+   other fix you try, because the scrape *looks* successful. `harvestContinuations`
+   matches on `postData()` containing `"continuation"`. This cost hours; don't
+   undo it.
+6. **On a watch page, don't wait for `ytInitialData` to update.** YouTube merges
+   `/next` back into it slowly, partially, and sometimes not at all. Worse, raw
+   `lockupViewModel` counts grow *before* the items become parseable, so every
+   "wait until it settles" heuristic returns early with half the rail. Parse the
+   `/next` **response bodies** directly, exactly as the home scrape parses
+   `/browse`.
+7. **A watch page briefly collapses to viewport height around the `load` event**
+   (`scrollHeight == innerHeight == 900`). A scroll issued in that window travels
+   ~50px and triggers nothing. And once parked at the bottom, re-setting
+   `scrollTop = scrollHeight` moves nothing and fires no intersection — retries
+   must "jiggle" up first to re-arm the sentinel.
+8. Settings rows (`recommendedStatus`/`Message`) persist in the DB and are *not*
    recomputed on boot — a stale `ok` can survive a deploy until the next scrape.
 
 ## Cookies (already done, but here's how to re-do it when they rotate)
@@ -95,10 +114,14 @@ The same `cookies.txt` also feeds yt-dlp (`--cookies`) for age-gated/members vid
 > parser was built and validated against. **It is outside the repo and contains
 > account context — never commit it**; derive synthesized fixtures from it, as
 > `recommended.lockup.test.ts` does. Copy it somewhere durable if you need it to
-> survive cleanup. For **P2** you'll want the equivalent capture of a *watch*
-> page (`window.ytInitialData` on `/watch?v=…`, plus a `/youtubei/v1/next`
-> response) — grab it the same way, from a logged-in browser DevTools console:
-> `copy(JSON.stringify(window.ytInitialData))`.
+> survive cleanup.
+>
+> A **watch-page capture** now also exists on this dev server, from the same
+> logged-in session: `~/mytube-fixtures/yt-watch.json` (2.8 MB `ytInitialData`)
+> and `~/mytube-fixtures/yt-watch-next.json` (the `/youtubei/v1/next` responses),
+> captured 2026-07-09 for `-YRXMgKMlWY`. Same rules: **outside the repo, account
+> context, never commit**. `recommended.upnext.test.ts` uses synthesized fixtures
+> derived from them.
 
 ## Validation checklist (once cookies are up)
 
@@ -129,8 +152,8 @@ The same `cookies.txt` also feeds yt-dlp (`--cookies`) for age-gated/members vid
 | File | Role |
 |---|---|
 | `src/lib/server/recommended.ts` | **Pure parser** of YouTube JSON (deep-walks `videoRenderer`). Drift-resistant, fixture-tested. |
-| `src/lib/server/recommended-scraper.ts` | Playwright driver (dynamic import). Home-page scrape, cookie seeding, wall detection. |
-| `src/lib/server/discover.ts` | The pool: `ingestRecommended`, `listRecommendations` (id-cursor), grab/dismiss, `requestManualScrape` (rate cap). |
+| `src/lib/server/recommended-scraper.ts` | Playwright driver (dynamic import). Home + up-next scrapes, continuation harvesting, cookie seeding, wall detection. |
+| `src/lib/server/discover.ts` | The pool: `ingestRecommended`, `listRecommendations` (id-cursor), grab/dismiss, `requestManualScrape` + `requestUpnextScrape` (rate caps). |
 | `src/lib/server/db/schema.ts` | `recommendations` table (`source`/`sourceVideoId`/`rank`/`status`). |
 | `src/routes/discover/*` | The surface: grid, Load more, Refresh, actions. |
 | `src/routes/api/recommended/*` | `GET` (paginate), `POST` (actions), `POST /refresh`. |
@@ -155,20 +178,28 @@ Goal: watch a recommendation without permanently keeping it.
   optionally also clear `ephemeral` on Keep.
 - Discover card: a "Watch now" button beside "Download".
 
-### P2 — up-next rabbit hole (do after real data)
-Goal: watching a video seeds more recommendations (the endless chain).
-- Parser: extend `recommended.ts` to also collect `compactVideoRenderer` and
-  `lockupViewModel` (watch-page up-next shapes) — **capture a real fixture first**
-  (headful browser) and add a `recommended.upnext.test.ts`.
-- Scraper: `scrapeWatchNext(videoId)` — load `watch?v=<id>`, capture `ytInitialData`
-  + `/youtubei/v1/next`, extract related, `ingestRecommended(items, {source:'upnext',
-  sourceVideoId})`.
-- Job: add `upnext_scrape` to the `jobs.type` enum (TS-only, no migration);
-  register a handler; **trigger from the watched-hook** (`setWatchedHook` in
-  `job-handlers.ts`), rate-capped / deduped per video. Add a per-card
-  "More like this" that enqueues it on demand.
-- Politeness: cap up-next scrapes (e.g. per hour) — more scrape surface = more
-  drift + cookie burn.
+### P2 — up-next rabbit hole ✅ shipped
+Watching a video now seeds more recommendations. `runUpnextScrape(videoId)` →
+`upnext_scrape` job → fired from `setWatchedHook`. Verified live: **59 related
+items, 5 continuations** off one watch page.
+
+What the original plan got wrong, for the record:
+- **No `compactVideoRenderer` anywhere.** The watch page is 100% `lockupViewModel`
+  — the *same* shape as the home feed. **The parser needed zero changes.** Don't
+  "extend the parser" for a new surface until you've confirmed it's actually new.
+- Watch-page lockups carry **no `commandRuns`**, hence `channelId` is always
+  `null`. P3's per-channel blocklist / diversity ranking must tolerate that.
+- Ads reach the rail via `adSlotRenderer` nesting a lockup with a real
+  `contentId`. It's rejected by `feedAdMetadataViewModel` alone — a lockup with
+  no `contentType` is otherwise *accepted*. That marker is load-bearing;
+  `recommended.upnext.test.ts` pins it.
+
+Remaining: a per-card **"More like this"** button that calls `requestUpnextScrape`
+on demand (the server side already exists and is rate-capped).
+
+Rate caps (`discover.ts`): per-video (`upnext:<id>` dedupe key + skip videos that
+already have `upnext` rows naming them as source) and global
+(`UPNEXT_MAX_PER_HOUR = 6`) — a binge would otherwise fire one scrape per video.
 
 ### P3 — flywheel + quality
 - **Flywheel:** ensure `HISTORY_SYNC_ENABLED` is on — watching locally pings
