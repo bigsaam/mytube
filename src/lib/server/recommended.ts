@@ -88,6 +88,58 @@ export function parseVideoRenderer(vr: Record<string, unknown>): RecommendedItem
 	};
 }
 
+/* ------------------------------------------------------ drift diagnostics */
+
+/**
+ * Renderer/view-model keys YouTube has used for feed items over time. Only used
+ * for diagnostics: when a scrape yields 0 items we tally these so the logs say
+ * *what* YouTube actually returned instead of leaving a silent zero.
+ */
+const RENDERER_KEYS = [
+	'videoRenderer',
+	'richItemRenderer',
+	'gridVideoRenderer',
+	'compactVideoRenderer',
+	'reelItemRenderer',
+	'lockupViewModel',
+	'videoLockupViewModel',
+	'shortsLockupViewModel',
+	'playlistRenderer',
+	'radioRenderer',
+	'movieRenderer',
+	'promotedVideoRenderer',
+	'richGridRenderer',
+	'shelfRenderer'
+] as const;
+
+/** Count occurrences of each known feed-item key. One traversal, cycle-safe. */
+export function countRendererKeys(data: unknown): Record<string, number> {
+	const root = typeof data === 'string' ? safeJson(data) : data;
+	const counts: Record<string, number> = {};
+	const seen = new Set<unknown>();
+	const known = new Set<string>(RENDERER_KEYS);
+	const walk = (node: unknown) => {
+		if (!node || typeof node !== 'object' || seen.has(node)) return;
+		seen.add(node);
+		if (Array.isArray(node)) {
+			for (const v of node) walk(v);
+			return;
+		}
+		for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+			if (known.has(k)) counts[k] = (counts[k] ?? 0) + 1;
+			walk(v);
+		}
+	};
+	walk(root);
+	return counts;
+}
+
+/** "videoRenderer=0, lockupViewModel=24, richItemRenderer=24" (top keys first). */
+export function summarizeRenderers(counts: Record<string, number>): string {
+	const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+	return entries.length ? entries.map(([k, n]) => `${k}=${n}`).join(', ') : 'none';
+}
+
 /* --------------------------------------------------- structural helpers */
 
 /**

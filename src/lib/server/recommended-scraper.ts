@@ -1,7 +1,12 @@
 import fs from 'node:fs';
 import { config } from './config';
 import { getSettings, setSetting } from './settings';
-import { extractRecommended, type RecommendedItem } from './recommended';
+import {
+	extractRecommended,
+	countRendererKeys,
+	summarizeRenderers,
+	type RecommendedItem
+} from './recommended';
 import { ingestRecommended } from './discover';
 
 /**
@@ -104,7 +109,24 @@ export async function runRecommendedScrape(): Promise<{ status: string; added?: 
 		];
 		const deduped = dedupe(items);
 
+		console.log(
+			`[recommended] scrape: ${deduped.length} item(s) seen (initialData=${initial ? 'yes' : 'no'}, continuations=${captured.length})`
+		);
+
+		// A logged-in YouTube home is never empty. Zero items means we loaded and
+		// parsed the page but recognised nothing in it — nearly always YouTube
+		// shape drift. Reporting that as `ok` makes a silent parser break look
+		// like a healthy scrape, so surface it and log WHICH renderers we saw.
+		if (deduped.length === 0) {
+			const seen = summarizeRenderers(rendererHistogram([initial, ...captured]));
+			console.warn(`[recommended] 0 items — possible shape drift. renderers seen: ${seen}`);
+			const message = `Scrape ran but found no videos — YouTube's page shape likely changed. Renderers seen: ${seen}`;
+			setStatus('needs_attention', message);
+			return { status: 'needs_attention', added: 0, message };
+		}
+
 		const added = ingestRecommended(deduped);
+		console.log(`[recommended] ingested ${added} new item(s) of ${deduped.length} seen`);
 		setStatus('ok', `Last scrape: ${deduped.length} items seen, ${added} new.`);
 		return { status: 'ok', added, message: `${added} new recommended item(s).` };
 	} catch (err) {
@@ -115,6 +137,17 @@ export async function runRecommendedScrape(): Promise<{ status: string; added?: 
 		await context.close().catch(() => {});
 		running = false;
 	}
+}
+
+/** Tally feed-item renderer keys across the initial payload + continuations. */
+function rendererHistogram(sources: unknown[]): Record<string, number> {
+	const total: Record<string, number> = {};
+	for (const src of sources) {
+		for (const [k, n] of Object.entries(countRendererKeys(src))) {
+			total[k] = (total[k] ?? 0) + n;
+		}
+	}
+	return total;
 }
 
 function dedupe(items: RecommendedItem[]): RecommendedItem[] {
