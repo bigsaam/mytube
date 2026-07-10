@@ -66,16 +66,20 @@ export async function runRecommendedScrape(): Promise<{ status: string; added?: 
 			else route.continue();
 		});
 
-		// Capture browse continuation JSON as we scroll.
+		// Capture browse continuation JSON as we scroll. `res.json()` is async, so
+		// track the in-flight parses and drain them before we read `captured`.
 		const captured: unknown[] = [];
-		page.on('response', async (res) => {
-			if (res.url().includes('/youtubei/v1/browse')) {
-				try {
-					captured.push(await res.json());
-				} catch {
-					/* not json / aborted */
-				}
-			}
+		const parsing: Promise<void>[] = [];
+		page.on('response', (res) => {
+			if (!res.url().includes('/youtubei/v1/browse')) return;
+			parsing.push(
+				res.json().then(
+					(json) => void captured.push(json),
+					() => {
+						/* not json / aborted */
+					}
+				)
+			);
 		});
 
 		await page.goto('https://www.youtube.com/', { waitUntil: 'domcontentloaded', timeout: 45_000 });
@@ -91,11 +95,8 @@ export async function runRecommendedScrape(): Promise<{ status: string; added?: 
 			return window.ytInitialData ?? null;
 		});
 
-		// Scroll a few times to pull continuations (polite: small, bounded).
-		for (let i = 0; i < 3; i++) {
-			await page.evaluate(() => window.scrollBy(0, window.innerHeight * 2));
-			await page.waitForTimeout(1500);
-		}
+		await harvestContinuations(page);
+		await Promise.all(parsing);
 
 		const s = getSettings();
 		const opts = {
@@ -136,6 +137,56 @@ export async function runRecommendedScrape(): Promise<{ status: string; added?: 
 	} finally {
 		await context.close().catch(() => {});
 		running = false;
+	}
+}
+
+/** How many bottom-scrolls to attempt per scrape. Polite: bounded, and we stop
+ * early the moment YouTube stops answering with a continuation. */
+const SCROLL_ROUNDS = 5;
+/** A continuation normally lands well inside this; a miss means "no more feed". */
+const CONTINUATION_TIMEOUT_MS = 8_000;
+
+/**
+ * Scroll to the bottom repeatedly so YouTube's continuation sentinel enters the
+ * viewport and fires `/youtubei/v1/browse`. Each round waits for that response
+ * rather than a blind sleep — the old fixed `scrollBy` + sleep raced the feed's
+ * first render and harvested zero continuations.
+ */
+async function harvestContinuations(page: import('playwright').Page): Promise<void> {
+	// Scrolling is meaningless until the feed has rendered enough to overflow the
+	// viewport. Gate on that rather than on a YouTube tag name, which drifts.
+	const scrollable = await page
+		.waitForFunction(
+			() => {
+				const el = document.scrollingElement ?? document.documentElement;
+				return el.scrollHeight > window.innerHeight * 1.5;
+			},
+			{ timeout: 20_000 }
+		)
+		.then(
+			() => true,
+			() => false
+		);
+	if (!scrollable) {
+		console.warn('[recommended] home feed never became scrollable — harvesting initial page only.');
+		return;
+	}
+
+	for (let i = 0; i < SCROLL_ROUNDS; i++) {
+		const continuation = page
+			.waitForResponse((res) => res.url().includes('/youtubei/v1/browse'), {
+				timeout: CONTINUATION_TIMEOUT_MS
+			})
+			.catch(() => null);
+
+		await page.evaluate(() => {
+			const el = document.scrollingElement ?? document.documentElement;
+			el.scrollTop = el.scrollHeight;
+		});
+
+		if (!(await continuation)) break; // feed exhausted, or YouTube stopped serving.
+		// Let the new rows lay out so the next scroll reaches a genuinely new bottom.
+		await page.waitForTimeout(750);
 	}
 }
 

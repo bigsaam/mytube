@@ -17,7 +17,7 @@ cookie upload → persistent Chromium profile → logged-in YouTube home →
 | **P1c** | Stream-and-discard (`ephemeral` videos) | ⬜ TODO |
 | **P2** | Up-next rabbit hole (watch-page related) | ⬜ TODO |
 | **P3** | Flywheel (history-sync) + quality (diversity/freshness/not-interested) | ⬜ TODO |
-| **bug** | `continuations=0` — scrapes only ever harvest the first screen | ⬜ **TODO, blocks "endless"** |
+| **bug** | `continuations=0` — scrapes only ever harvest the first screen | ✅ **fixed & verified** |
 
 ## Hard-won lessons (read before touching the scraper)
 
@@ -32,11 +32,25 @@ cookie upload → persistent Chromium profile → logged-in YouTube home →
    items means a silently broken parser. `dbc40b2` makes it `needs_attention` and
    logs a histogram of the renderer keys actually seen — that one line is the
    whole drift diagnosis. Check it first.
-4. **`continuations=0`.** The scraper scrolls 3× to pull `/youtubei/v1/browse`
-   continuations, but captures none, so each scrape only harvests the initial
-   page (~23 items). Suspect the scroll fires before the feed is interactive, or
-   the `res.json()` handler races navigation. **This caps pool growth and is the
-   main thing standing between "a feed" and "endless".** Fix before P3.
+4. **Continuations need a *bottom* scroll, after the feed renders.** (Fixed; was
+   the `continuations=0` bug.) YouTube fetches `/youtubei/v1/browse` when its
+   continuation sentinel — which sits at the very bottom — enters the viewport.
+   The old loop scrolled a fixed `innerHeight * 2` right after `domcontentloaded`,
+   before the page was even tall enough to scroll, and floated `res.json()` in an
+   async `response` handler that could still be in flight at `context.close()`.
+   `harvestContinuations` now waits for the document to overflow the viewport,
+   then per round arms a `waitForResponse` on `/browse`, scrolls to the true
+   bottom, and breaks early if nothing lands. Verified live: **1 continuation /
+   46 items → 6 / 145**, same cookies and profile.
+   - Gate on *scrollability*, not on `ytd-rich-item-renderer` or any other
+     YouTube tag name — same drift risk as the parser (lesson 1).
+   - `SCROLL_ROUNDS = 5` is now the **binding limit** (every round lands a
+     continuation; the early-break never fires). Raise it for a deeper pool,
+     traded against politeness. It is no longer a bug.
+   - **Logged-out YouTube serves no home feed at all** — `scrollHeight ==
+     innerHeight`, nothing to scroll. Any scroll/continuation work is
+     unverifiable without cookies; a logged-out probe will report 0 and tell you
+     nothing.
 5. Settings rows (`recommendedStatus`/`Message`) persist in the DB and are *not*
    recomputed on boot — a stale `ok` can survive a deploy until the next scrape.
 
@@ -63,8 +77,17 @@ Look for `[cookies] saved <n>B → /data/cookies.txt` in the logs to confirm it 
 The same `cookies.txt` also feeds yt-dlp (`--cookies`) for age-gated/members videos.
 
 > **Local-dev testing with real scrapes** (this dev machine): scp `cookies.txt`
-> into `./data/cookies.txt`, `pnpm exec playwright install chromium`, set
-> `RECOMMENDED_FEED_ENABLED=true`, run the built server.
+> into `./data/cookies.txt` (gitignored via `/data`), `pnpm exec playwright
+> install chromium`, set `RECOMMENDED_FEED_ENABLED=true`, run the built server.
+>
+> To drive one scrape without the server, put a scratch `*.test.ts` in
+> `src/lib/server/` that calls `runMigrations()` then `runRecommendedScrape()`,
+> and run it with `npx vitest run <file>`. Vitest is the easy path because
+> `config.ts` imports `$env/dynamic/private`, which only resolves under the
+> bundler — for the same reason **`pnpm db:migrate` fails outside the build**
+> (`Cannot find package '$lib'`), so migrate from that scratch test too. Delete
+> the scratch file afterwards. The `[recommended] scrape: … continuations=N` log
+> line is the pass/fail signal.
 >
 > **A real home-page capture already exists on this dev server:**
 > `/home/sam/.paseo/uploads/upload_034e435e-cf9d-4bab-88c5-1622c85b4c7e/yt-home.json`
