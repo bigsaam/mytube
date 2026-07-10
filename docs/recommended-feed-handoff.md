@@ -64,9 +64,18 @@ The same `cookies.txt` also feeds yt-dlp (`--cookies`) for age-gated/members vid
 
 > **Local-dev testing with real scrapes** (this dev machine): scp `cookies.txt`
 > into `./data/cookies.txt`, `pnpm exec playwright install chromium`, set
-> `RECOMMENDED_FEED_ENABLED=true`, run the built server. A headful capture of a
-> real `ytInitialData` / watch-page `/next` response is the best way to build P2
-> fixtures (see below).
+> `RECOMMENDED_FEED_ENABLED=true`, run the built server.
+>
+> **A real home-page capture already exists on this dev server:**
+> `/home/sam/.paseo/uploads/upload_034e435e-cf9d-4bab-88c5-1622c85b4c7e/yt-home.json`
+> (1.8 MB `ytInitialData`, captured 2026-07-09). It is what the `lockupViewModel`
+> parser was built and validated against. **It is outside the repo and contains
+> account context — never commit it**; derive synthesized fixtures from it, as
+> `recommended.lockup.test.ts` does. Copy it somewhere durable if you need it to
+> survive cleanup. For **P2** you'll want the equivalent capture of a *watch*
+> page (`window.ytInitialData` on `/watch?v=…`, plus a `/youtubei/v1/next`
+> response) — grab it the same way, from a logged-in browser DevTools console:
+> `copy(JSON.stringify(window.ytInitialData))`.
 
 ## Validation checklist (once cookies are up)
 
