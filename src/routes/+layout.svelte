@@ -25,8 +25,12 @@
 			<QuickAdd />
 		</header>
 
-		<main class="flex-1 overflow-y-auto px-6 py-6">
-			{@render children()}
+		<!-- Column layout so the footer sits at the bottom of the viewport on short
+		     pages, instead of floating up under the content. -->
+		<main class="flex flex-1 flex-col overflow-y-auto px-6 py-6">
+			<div class="flex-1">
+				{@render children()}
+			</div>
 			<div class="mt-10 pt-4">
 				<Footer subtle />
 			</div>

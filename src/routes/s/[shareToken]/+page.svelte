@@ -22,14 +22,16 @@
 	<meta name="robots" content="noindex" />
 </svelte:head>
 
-<div class="min-h-screen bg-bg">
-	<header class="flex h-14 items-center gap-2 border-b border-line px-6">
+<!-- Column layout so the footer pins to the bottom of the viewport even when the
+     content is short (e.g. the "video isn't available" state). -->
+<div class="flex min-h-screen flex-col bg-bg">
+	<header class="flex h-14 shrink-0 items-center gap-2 border-b border-line px-6">
 		<div class="grid h-7 w-7 place-items-center rounded-md bg-accent text-bg"><Icon name="play" size={16} /></div>
 		<span class="font-semibold">MyTube</span>
 		<span class="text-sm text-fg-faint">· shared video</span>
 	</header>
 
-	<div class="mx-auto max-w-5xl px-4 py-6">
+	<div class="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
 		{#if !data.playable}
 			<div class="card p-8 text-center text-fg-muted">
 				<p class="text-lg font-medium">This video isn't available right now.</p>
@@ -89,7 +91,10 @@
 
 			<p class="mt-8 text-center text-xs text-fg-faint">Shared from a private MyTube library.</p>
 		{/if}
-		<div class="mt-6 border-t border-line pt-6">
+	</div>
+
+	<div class="mx-auto w-full max-w-5xl shrink-0 px-4 pb-6">
+		<div class="border-t border-line pt-6">
 			<Footer />
 		</div>
 	</div>
