@@ -3,7 +3,7 @@
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import FeedCard from '$lib/components/FeedCard.svelte';
 	import Icon from '$lib/components/Icon.svelte';
-	import { invalidateAll } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import type { PageData } from './$types';
 	import type { DiscoverCard } from '$lib/server/discover';
 
@@ -31,6 +31,26 @@
 			});
 			if (!res.ok) throw new Error();
 			flash(action === 'dismiss' ? 'Dismissed' : action === 'watchLater' ? 'Grabbing → Watch Later' : 'Grabbing');
+		} catch {
+			flash('Something went wrong');
+		}
+	}
+
+	/**
+	 * Stream-and-discard: grab it as `ephemeral`, then go straight to the watch
+	 * page (which renders the still-downloading state). The cleanup sweep prunes it
+	 * once watched, unless the user hits Keep there.
+	 */
+	async function onWatchNow(id: number) {
+		try {
+			const res = await fetch('/api/recommended', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ id, action: 'watchNow' })
+			});
+			if (!res.ok) throw new Error();
+			const { videoId } = (await res.json()) as { videoId: string };
+			await goto(`/watch/${videoId}`);
 		} catch {
 			flash('Something went wrong');
 		}
@@ -100,6 +120,7 @@
 				durationSeconds={item.durationSeconds}
 				thumbnailUrl={item.thumbnailUrl}
 				{onAction}
+				{onWatchNow}
 			/>
 		{/each}
 	</div>

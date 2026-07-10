@@ -46,6 +46,8 @@ export interface EnqueueOptions {
 	addToWatchLater?: boolean;
 	maxHeight?: number | null;
 	priority?: number;
+	/** Stream-and-discard: pruned once watched, unless the user hits Keep. */
+	ephemeral?: boolean;
 	// Linkage back to a synced YouTube playlist (for remove-on-watched).
 	sourcePlaylistId?: string | null;
 	playlistItemId?: string | null;
@@ -73,6 +75,9 @@ export function enqueueDownload(opts: EnqueueOptions): EnqueueResult {
 				channelSlug: channelSlug(opts.channelName, opts.channelId),
 				durationSeconds: opts.durationSeconds ?? null,
 				status: 'pending',
+				// Only ever set on insert: a video already in the library was chosen
+				// deliberately, so "Watch now" must not silently mark it disposable.
+				ephemeral: !!opts.ephemeral,
 				inWatchLater: !!opts.addToWatchLater,
 				watchLaterOrder: opts.addToWatchLater ? nextWatchLaterOrder() : null,
 				sourcePlaylistId: opts.sourcePlaylistId ?? null,

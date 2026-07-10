@@ -114,6 +114,9 @@ export const videos = sqliteTable(
 		watchLaterOrder: integer('watch_later_order'),
 		// Exempt from cleanup policies when true.
 		pinned: integer('pinned', { mode: 'boolean' }).notNull().default(false),
+		// "Watch now" from Discover: stream it, then prune it once watched. Cleared
+		// by Keep (pin), which promotes it to a permanent library item.
+		ephemeral: integer('ephemeral', { mode: 'boolean' }).notNull().default(false),
 		// Files removed by cleanup but the record is kept as history.
 		filesDeleted: integer('files_deleted', { mode: 'boolean' }).notNull().default(false),
 		// "Mark watched locally only" — never enqueue a history_sync for this video.

@@ -11,6 +11,11 @@
 		thumbnailUrl?: string | null;
 		publishedAt?: Date | string | null;
 		onAction: (id: number, action: 'grab' | 'watchLater' | 'dismiss') => void;
+		/**
+		 * Stream-and-discard. Optional: only Discover can watch-now, because only
+		 * pooled recommendations are disposable. Omit it and the button is absent.
+		 */
+		onWatchNow?: (id: number) => void;
 	}
 	let {
 		id,
@@ -20,7 +25,8 @@
 		durationSeconds,
 		thumbnailUrl,
 		publishedAt,
-		onAction
+		onAction,
+		onWatchNow
 	}: Props = $props();
 
 	let busy = $state(false);
@@ -28,6 +34,11 @@
 		if (busy) return;
 		busy = true;
 		onAction(id, action);
+	}
+	function watchNow() {
+		if (busy) return;
+		busy = true;
+		onWatchNow?.(id);
 	}
 
 	let published = $derived(publishedAt ? new Date(publishedAt) : null);
@@ -64,6 +75,16 @@
 		<button class="btn-accent flex-1 py-1.5 text-xs" onclick={() => act('grab')} disabled={busy}>
 			<Icon name="grab" size={14} /> Grab
 		</button>
+		{#if onWatchNow}
+			<button
+				class="btn-ghost py-1.5 text-xs"
+				onclick={watchNow}
+				disabled={busy}
+				title="Watch now (deleted after watching unless you Keep it)"
+			>
+				<Icon name="play" size={14} />
+			</button>
+		{/if}
 		<button class="btn-ghost py-1.5 text-xs" onclick={() => act('watchLater')} disabled={busy} title="Grab + Watch Later">
 			<Icon name="watch-later" size={14} />
 		</button>

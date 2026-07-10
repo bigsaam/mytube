@@ -79,14 +79,17 @@ export function deleteFiles(videoId: string): boolean {
 }
 
 /**
- * Run the cleanup policy. Returns how many videos were pruned. Two passes,
- * unioned (a video pinned/"kept" is exempt from both):
+ * Run the cleanup policy. Returns how many videos were pruned. Three passes,
+ * unioned (a video pinned/"kept" is exempt from all of them):
  * - Global policy over ALL videos:
  *     keep_forever → no-op · delete_immediately → any watched · delete_after_days
  *     → watched longer than N days ago.
  * - Playlist-queue pass (when cleanupPlaylistWatched): watched videos that came
  *     from the synced playlist are pruned every sweep, regardless of the global
  *     policy — so the playlist behaves as a transient download queue.
+ * - Ephemeral pass: "Watch now" videos from Discover are pruned once watched,
+ *     regardless of the global policy (that's the point of stream-and-discard).
+ *     Keep/pin clears `ephemeral`, promoting it to a normal library item.
  */
 export function runCleanupSweep(): number {
 	const s = getSettings();
@@ -115,6 +118,22 @@ export function runCleanupSweep(): number {
 			eq(videos.filesDeleted, false),
 			isNotNull(videos.videoPath),
 			isNotNull(videos.sourcePlaylistId)
+		];
+		for (const t of db.select({ videoId: videos.videoId }).from(videos).where(and(...conds)).all()) {
+			ids.add(t.videoId);
+		}
+	}
+
+	// Stream-and-discard. Unconditional: an ephemeral video was never meant to be
+	// kept, so it is pruned even under `keep_forever`. Keep (pin) is the escape
+	// hatch, and it clears the flag outright.
+	{
+		const conds = [
+			eq(videos.watched, true),
+			eq(videos.pinned, false),
+			eq(videos.filesDeleted, false),
+			isNotNull(videos.videoPath),
+			eq(videos.ephemeral, true)
 		];
 		for (const t of db.select({ videoId: videos.videoId }).from(videos).where(and(...conds)).all()) {
 			ids.add(t.videoId);

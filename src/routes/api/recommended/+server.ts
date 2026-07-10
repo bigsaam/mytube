@@ -9,22 +9,29 @@ export const GET: RequestHandler = ({ url }) => {
 	return json({ items: listRecommendations({ beforeId: before, limit }) });
 };
 
-/** Discover card actions: grab / watchLater / dismiss. */
+/** Discover card actions: grab / watchLater / watchNow / dismiss. */
 export const POST: RequestHandler = async ({ request }) => {
 	const body = (await request.json().catch(() => null)) as {
 		id?: number;
-		action?: 'grab' | 'watchLater' | 'dismiss';
+		action?: 'grab' | 'watchLater' | 'watchNow' | 'dismiss';
 	} | null;
 	const id = Number(body?.id);
 	if (!Number.isFinite(id) || !body?.action) error(400, 'Bad request');
 
 	switch (body.action) {
 		case 'grab':
-			grabRecommendation(id, false);
+			grabRecommendation(id);
 			break;
 		case 'watchLater':
-			grabRecommendation(id, true);
+			grabRecommendation(id, { watchLater: true });
 			break;
+		// Stream-and-discard: download it, hand the client the id to navigate to,
+		// and let the cleanup sweep prune it once watched (unless the user Keeps it).
+		case 'watchNow': {
+			const videoId = grabRecommendation(id, { ephemeral: true });
+			if (!videoId) error(404, 'No such recommendation');
+			return json({ ok: true, videoId });
+		}
 		case 'dismiss':
 			dismissRecommendation(id);
 			break;

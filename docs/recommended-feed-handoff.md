@@ -1,7 +1,7 @@
 # Recommended feed — build handoff
 
 Status of the "Discover / recommended feed" flywheel and what's left. Pick this
-up cold in a new session. Last updated after **P1b** (commit `6f5b740`).
+up cold in a new session. Last updated after **P1c + P2**; only **P3** remains.
 
 ## TL;DR
 
@@ -14,7 +14,7 @@ cookie upload → persistent Chromium profile → logged-in YouTube home →
 | **P0** | Enable it on prod (Chromium image, flag, cookies) | ✅ **done & verified** |
 | **P1a** | Dedicated `/discover` surface + pool table | ✅ shipped (`4e32a0c`) |
 | **P1b** | On-demand **Refresh** (rate-capped) | ✅ shipped (`6f5b740`) |
-| **P1c** | Stream-and-discard (`ephemeral` videos) | ⬜ TODO |
+| **P1c** | Stream-and-discard (`ephemeral` videos) | ✅ **shipped** |
 | **P2** | Up-next rabbit hole (watch-page related) | ✅ **shipped & verified** (no UI button yet) |
 | **P3** | Flywheel (history-sync) + quality (diversity/freshness/not-interested) | ⬜ TODO |
 | **bug** | `continuations=0` — scrapes only ever harvest the first screen | ✅ **fixed & verified** |
@@ -166,17 +166,23 @@ vs library + pool) → `/discover`.
 
 ## Remaining work (build-ready notes)
 
-### P1c — stream-and-discard
-Goal: watch a recommendation without permanently keeping it.
-- Schema: add `videos.ephemeral` boolean (new migration).
-- `downloads.ts`: thread `ephemeral` through `EnqueueOptions` → the `videos` insert.
-- `discover.ts` + `/api/recommended`: a `watchNow` action → `grabRecommendation`
-  with `ephemeral: true`; return the `videoId` so the client can navigate to
-  `/watch/<id>` (the watch page already renders the downloading state).
-- `lifecycle.ts` `runCleanupSweep`: add a pass pruning **watched + ephemeral +
-  unpinned** videos (mirror the playlist-queue pass). **Keep** (pin) exempts it;
-  optionally also clear `ephemeral` on Keep.
-- Discover card: a "Watch now" button beside "Download".
+### P1c — stream-and-discard ✅ shipped
+"Watch now" on a Discover card grabs the video as `ephemeral` and navigates to
+`/watch/<id>`; the cleanup sweep prunes it once watched.
+
+- Migration `0008_ordinary_invisible_woman.sql` adds `videos.ephemeral`.
+- `ephemeral` is set **only on insert** — a video already in your library was
+  chosen deliberately, so "Watch now" must never mark it disposable.
+- The sweep's ephemeral pass is **unconditional**: it prunes even under
+  `keep_forever`, since an ephemeral video was never meant to be kept.
+- **Keep (pin) clears `ephemeral` outright**, rather than just exempting it.
+  Otherwise un-pinning later would silently re-arm the sweep and delete
+  something the user explicitly kept.
+- Pins are guarded twice (the sweep query *and* `deleteFiles`). Deliberate —
+  `lifecycle.ephemeral.test.ts` documents that a mutation to either layer alone
+  still passes, so don't "simplify" one away.
+- `FeedCard` takes an optional `onWatchNow`; `/feed` omits it, so the button
+  only appears on Discover, where items are actually disposable.
 
 ### P2 — up-next rabbit hole ✅ shipped
 Watching a video now seeds more recommendations. `runUpnextScrape(videoId)` →

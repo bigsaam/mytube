@@ -114,9 +114,20 @@ export function countNewRecommendations(): number {
 }
 
 /** Grab (download) a pooled recommendation, optionally into Watch Later. */
-export function grabRecommendation(id: number, watchLater = false): void {
+export interface GrabOptions {
+	watchLater?: boolean;
+	/** Stream-and-discard: pruned once watched, unless the user hits Keep. */
+	ephemeral?: boolean;
+}
+
+/**
+ * Pull a pooled recommendation into the library. Returns the videoId so callers
+ * (e.g. "Watch now") can navigate straight to `/watch/<id>`, which already
+ * renders the still-downloading state.
+ */
+export function grabRecommendation(id: number, opts: GrabOptions = {}): string | null {
 	const rec = db.select().from(recommendations).where(eq(recommendations.id, id)).get();
-	if (!rec) return;
+	if (!rec) return null;
 	enqueueDownload({
 		videoId: rec.videoId,
 		title: rec.title,
@@ -124,9 +135,11 @@ export function grabRecommendation(id: number, watchLater = false): void {
 		channelName: rec.channelName,
 		thumbnailUrl: rec.thumbnailUrl,
 		durationSeconds: rec.durationSeconds,
-		addToWatchLater: watchLater
+		addToWatchLater: !!opts.watchLater,
+		ephemeral: !!opts.ephemeral
 	});
 	db.update(recommendations).set({ status: 'downloaded' }).where(eq(recommendations.id, id)).run();
+	return rec.videoId;
 }
 
 export function dismissRecommendation(id: number): void {

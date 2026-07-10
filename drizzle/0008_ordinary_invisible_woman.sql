@@ -1,0 +1,1 @@
+ALTER TABLE `videos` ADD `ephemeral` integer DEFAULT false NOT NULL;

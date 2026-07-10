@@ -100,7 +100,11 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const videoId = id(form);
 		const pinned = form.get('pinned') === '1';
-		db.update(videos).set({ pinned }).where(eq(videos.videoId, videoId)).run();
+		// Keeping a "Watch now" video promotes it to a permanent library item, so
+		// clear `ephemeral` outright — otherwise un-pinning it later would silently
+		// re-arm the stream-and-discard sweep and delete something the user kept.
+		const patch = pinned ? { pinned, ephemeral: false } : { pinned };
+		db.update(videos).set(patch).where(eq(videos.videoId, videoId)).run();
 		return { ok: true };
 	},
 	historyOptout: async ({ request }) => {
