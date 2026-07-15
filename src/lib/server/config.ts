@@ -43,6 +43,19 @@ export const config = {
 	get authEnabled(): boolean {
 		return !!(this.authMasterToken || this.authPassword);
 	},
+
+	// Forward-auth via an SSO proxy (Authentik outpost). When AUTH_PROXY_SECRET is
+	// set, MyTube trusts `authProxyIdentityHeader` (who the user is) ONLY on
+	// requests that also carry `authProxySecretHeader` matching the secret — which
+	// only the trusted outpost injects. This defeats header spoofing regardless of
+	// network position. Dormant unless the secret is configured, so setting none
+	// leaves auth behaviour exactly as before.
+	authProxySecret: (env.AUTH_PROXY_SECRET ?? '').trim() || null,
+	authProxySecretHeader: ((env.AUTH_PROXY_SECRET_HEADER ?? 'x-mytube-proxy-secret').trim() || 'x-mytube-proxy-secret').toLowerCase(),
+	authProxyIdentityHeader: ((env.AUTH_PROXY_IDENTITY_HEADER ?? 'x-authentik-email').trim() || 'x-authentik-email').toLowerCase(),
+	get authProxyEnabled(): boolean {
+		return !!this.authProxySecret;
+	},
 	// Secure-cookie flag: on when serving over HTTPS. Override with AUTH_COOKIE_SECURE.
 	get cookieSecure(): boolean {
 		if (env.AUTH_COOKIE_SECURE != null) return bool(env.AUTH_COOKIE_SECURE, false);

@@ -113,6 +113,19 @@ MyTube runs **open (LAN-only)** until you set `AUTH_TOKEN` **or** `AUTH_PASSWORD
   tokens** in *Settings → Access & API tokens* (one per device; hashed at rest,
   shown once).
 
+- **SSO proxy** (Authentik outpost / other forward-auth) → set `AUTH_PROXY_SECRET`.
+  MyTube then trusts an identity header (`AUTH_PROXY_IDENTITY_HEADER`, default
+  `X-authentik-email`) **only** on requests that also carry a secret header
+  (`AUTH_PROXY_SECRET_HEADER`, default `X-mytube-proxy-secret`) matching the
+  secret — which only the trusted proxy injects, so the identity header can't be
+  spoofed by anything reaching the container directly. On such a request MyTube
+  mints a normal session cookie, so same-origin media/API calls keep working.
+  Point the proxy at the app, gate the human pages, and **skip-path the machine
+  and public surfaces** — `^/api/` (bearer clients + media) and `^/s/` (public
+  share links) — so device clients and share recipients bypass the SSO wall.
+  Dormant unless `AUTH_PROXY_SECRET` is set; the token/bearer paths above still
+  work as break-glass and for machines.
+
 Generate a token with `openssl rand -hex 32`. Full endpoint reference and
 client examples: **[docs/API.md](docs/API.md)**.
 

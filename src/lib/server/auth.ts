@@ -149,6 +149,28 @@ export function verifyApiToken(token: string): string | null {
 	return row.name;
 }
 
+/* ------------------------------------------------- forward-auth (SSO proxy) */
+
+/**
+ * Identity asserted by a trusted SSO proxy (Authentik outpost), or null.
+ *
+ * The identity header (who you are) is trusted ONLY when the secret header —
+ * which only the outpost injects — matches `config.authProxySecret`. Without
+ * that gate, any client able to reach MyTube directly could forge the identity
+ * header and walk in. With it, the proxy is the only thing that can vouch for a
+ * user, so this stays safe even if the container port is reachable on the LAN.
+ *
+ * Returns the identity string (an email) for callers that want to mint a session
+ * from it. Dormant unless AUTH_PROXY_SECRET is configured.
+ */
+export function proxyIdentity(event: RequestEvent): string | null {
+	if (!config.authProxyEnabled) return null;
+	const presented = event.request.headers.get(config.authProxySecretHeader);
+	if (!presented || !safeEqual(presented, config.authProxySecret as string)) return null;
+	const identity = event.request.headers.get(config.authProxyIdentityHeader)?.trim();
+	return identity || null;
+}
+
 /* --------------------------------------------------------- request check */
 
 function extractBearer(event: RequestEvent): string | null {
@@ -161,9 +183,14 @@ function extractBearer(event: RequestEvent): string | null {
 	return null;
 }
 
-/** True if the request carries a valid session cookie or bearer token. */
+/**
+ * True if the request carries a valid session cookie, bearer token, or a
+ * trusted SSO-proxy identity header. Order is cheapest-first; the proxy check
+ * only does work when forward-auth is configured.
+ */
 export function isAuthenticated(event: RequestEvent): boolean {
 	if (verifySessionValue(event.cookies.get(SESSION_COOKIE))) return true;
 	const token = extractBearer(event);
-	return token != null && verifyApiToken(token) != null;
+	if (token != null && verifyApiToken(token) != null) return true;
+	return proxyIdentity(event) != null;
 }
