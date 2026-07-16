@@ -1,8 +1,14 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import Icon from './Icon.svelte';
 	import { formatDuration } from '$lib/format';
 	import type { Chapter, SponsorSegment } from '$lib/server/db/schema';
+
+	interface QueueItem {
+		videoId: string;
+		title: string;
+	}
 
 	interface Props {
 		videoId: string;
@@ -19,6 +25,10 @@
 		streamSrc?: string;
 		posterSrc?: string;
 		subsSrc?: string;
+		/** Ordered play-queue for autoplay-next + repeat (empty = single video). */
+		queue?: QueueItem[];
+		/** The `?list=` context to carry when navigating between queued videos. */
+		listParam?: string | null;
 	}
 	let {
 		videoId,
@@ -32,8 +42,57 @@
 		share = false,
 		streamSrc,
 		posterSrc,
-		subsSrc
+		subsSrc,
+		queue = [],
+		listParam = null
 	}: Props = $props();
+
+	/* -------------------------------------------------------- play queue */
+	let queueIndex = $derived(queue.findIndex((q) => q.videoId === videoId));
+	let hasQueue = $derived(queue.length > 1 && queueIndex >= 0);
+	// Repeat the whole queue: at the end of the list, wrap back to the first.
+	let repeat = $state(false);
+
+	function queueHref(item: QueueItem): string {
+		const q = listParam ? `?list=${encodeURIComponent(listParam)}` : '';
+		return `/watch/${item.videoId}${q}`;
+	}
+	function goToIndex(i: number) {
+		const item = queue[i];
+		if (item) goto(queueHref(item));
+	}
+	function playNext() {
+		if (!hasQueue) return;
+		if (queueIndex < queue.length - 1) goToIndex(queueIndex + 1);
+		else if (repeat) goToIndex(0);
+	}
+	function playPrev() {
+		if (!hasQueue) return;
+		// Restart current track if we're past the intro, else step back.
+		if ((video?.currentTime ?? 0) > 3) seek(0);
+		else if (queueIndex > 0) goToIndex(queueIndex - 1);
+		else if (repeat) goToIndex(queue.length - 1);
+	}
+	function onEnded() {
+		flushProgress(true);
+		if (repeat && !hasQueue) {
+			// Single video on repeat.
+			if (video) {
+				video.currentTime = 0;
+				video.play();
+			}
+			return;
+		}
+		if (hasQueue) playNext();
+	}
+
+	/* ---------------------------------------------------------- AirPlay */
+	// WebKit Remote Playback (Safari on iOS/macOS/iPadOS). Undefined elsewhere.
+	let airplayAvailable = $state(false);
+	function showAirPlayPicker() {
+		// @ts-expect-error — WebKit-only API, not in lib.dom types.
+		video?.webkitShowPlaybackTargetPicker?.();
+	}
 
 	let streamUrl = $derived(streamSrc ?? `/api/stream/${videoId}`);
 	let posterUrl = $derived(posterSrc ?? `/api/thumb/${videoId}`);
@@ -88,9 +147,19 @@
 		const ping = setInterval(() => {
 			if (!paused) flushProgress();
 		}, 5000);
+		// AirPlay: Safari fires this when a route (Apple TV, AirPlay speaker) appears.
+		const onAirplay = (e: Event) => {
+			// @ts-expect-error — WebKit-only event payload.
+			airplayAvailable = e.availability === 'available';
+		};
+		// Non-standard attribute (not in the HTML typings) — set it imperatively so
+		// Safari keeps its inline AirPlay affordance available on the element.
+		video?.setAttribute('x-webkit-airplay', 'allow');
+		video?.addEventListener('webkitplaybacktargetavailabilitychanged', onAirplay);
 		return () => {
 			document.removeEventListener('fullscreenchange', onFs);
 			window.removeEventListener('beforeunload', beacon);
+			video?.removeEventListener('webkitplaybacktargetavailabilitychanged', onAirplay);
 			clearInterval(ping);
 			flushProgress();
 		};
@@ -286,11 +355,13 @@
 		src={streamUrl}
 		poster={posterUrl}
 		autoplay
+		playsinline
 		bind:paused
 		bind:volume
 		bind:muted
 		onloadedmetadata={onLoaded}
 		ontimeupdate={onTimeUpdate}
+		onended={onEnded}
 		onclick={togglePlay}
 		ondblclick={toggleFullscreen}
 	>
@@ -359,9 +430,17 @@
 
 		<!-- Buttons -->
 		<div class="flex items-center gap-3 text-white">
+			{#if hasQueue}
+				<button onclick={playPrev} aria-label="Previous" title="Previous" class="text-sm hover:text-accent">⏮</button>
+			{/if}
+
 			<button onclick={togglePlay} aria-label={paused ? 'Play' : 'Pause'} class="hover:text-accent">
 				{#if paused}<Icon name="play" size={22} />{:else}<span class="text-lg leading-none">❚❚</span>{/if}
 			</button>
+
+			{#if hasQueue}
+				<button onclick={playNext} aria-label="Next" title="Next" class="text-sm hover:text-accent">⏭</button>
+			{/if}
 
 			<button onclick={toggleMute} aria-label="Mute" class="hover:text-accent">
 				<span class="text-sm">{muted || volume === 0 ? '🔇' : '🔊'}</span>
@@ -406,6 +485,23 @@
 						</div>
 					{/if}
 				</div>
+
+				{#if hasQueue}
+					<span class="text-xs tabular-nums text-white/60" title="Position in queue">{queueIndex + 1}/{queue.length}</span>
+				{/if}
+
+				{#if !share}
+					<button
+						onclick={() => (repeat = !repeat)}
+						class="text-sm {repeat ? 'text-accent' : 'text-white/70 hover:text-white'}"
+						title={hasQueue ? 'Repeat queue' : 'Repeat'}
+						aria-label="Repeat"
+					>🔁</button>
+				{/if}
+
+				{#if airplayAvailable}
+					<button onclick={showAirPlayPicker} class="text-sm hover:text-accent" title="AirPlay" aria-label="AirPlay">📺</button>
+				{/if}
 
 				<button onclick={() => (theater = !theater)} class="hover:text-accent" title="Theater mode (t)" aria-label="Theater mode">
 					<span class="text-sm">▭</span>

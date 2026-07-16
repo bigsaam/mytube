@@ -66,6 +66,8 @@
 			sponsorblock={data.video.sponsorblock}
 			positionSeconds={data.video.positionSeconds}
 			autoSkipDefault={data.autoSkipDefault}
+			queue={data.queue ?? []}
+			listParam={data.listParam ?? null}
 		/>
 
 		<div class="mx-auto {theater ? 'max-w-5xl' : ''}">

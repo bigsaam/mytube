@@ -14,6 +14,11 @@ ARG NODE_VERSION=22-bookworm-slim
 # page has a "self-update yt-dlp" button (yt-dlp -U) to move ahead of this
 # baseline without rebuilding, and `--build-arg YTDLP_VERSION=<tag>` overrides it.
 ARG YTDLP_VERSION=2026.07.04
+# yt-dlp needs a real JS runtime to solve YouTube's "n" challenge (its EJS
+# system). Without one, extraction yields only storyboard images and every
+# download fails with "Requested format is not available". Deno is yt-dlp's
+# preferred runtime and is auto-detected on PATH. Pin it like yt-dlp.
+ARG DENO_VERSION=2.9.3
 
 ############################### deps / build ##############################
 FROM node:${NODE_VERSION} AS build
@@ -47,6 +52,7 @@ RUN pnpm exec playwright install --with-deps chromium
 ############################### runtime ###################################
 FROM node:${NODE_VERSION} AS runtime
 ARG YTDLP_VERSION
+ARG DENO_VERSION
 ENV NODE_ENV=production \
 	PORT=3000 \
 	DATABASE_PATH=/data/mytube.db \
@@ -62,6 +68,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 	&& curl -fsSL "https://github.com/yt-dlp/yt-dlp/releases/download/${YTDLP_VERSION}/yt-dlp" \
 		-o /usr/local/bin/yt-dlp \
 	&& chmod a+rx /usr/local/bin/yt-dlp \
+	&& curl -fsSL "https://github.com/denoland/deno/releases/download/v${DENO_VERSION}/deno-x86_64-unknown-linux-gnu.zip" \
+		-o /tmp/deno.zip \
+	&& python3 -c "import zipfile; zipfile.ZipFile('/tmp/deno.zip').extractall('/usr/local/bin')" \
+	&& chmod a+rx /usr/local/bin/deno \
+	&& rm -f /tmp/deno.zip \
 	&& rm -rf /var/lib/apt/lists/*
 
 # App: built output, production deps, migrations, and package metadata.

@@ -88,6 +88,29 @@ export function listLibrary(filter: LibraryFilter = {}): LibraryCard[] {
 	}));
 }
 
+export interface QueueItem {
+	videoId: string;
+	title: string;
+}
+
+/**
+ * Build an ordered, playable play-queue from a compact `list` context descriptor
+ * (carried in the watch page's `?list=` param). Powers autoplay-next + repeat.
+ * Grammar: `wl` (Watch Later), `ch:<channelId>`, or `all` (whole library).
+ * Only `ready`, non-deleted videos are included so every item can actually play.
+ */
+export function listPlayQueue(list: string): QueueItem[] {
+	let filter: LibraryFilter;
+	if (list === 'wl') filter = { watchLater: true };
+	else if (list === 'all') filter = {};
+	else if (list.startsWith('ch:')) filter = { channelId: list.slice(3) };
+	else return [];
+
+	return listLibrary(filter)
+		.filter((v) => v.status === 'ready' && !v.filesDeleted)
+		.map((v) => ({ videoId: v.videoId, title: v.title }));
+}
+
 export interface DownloadRow {
 	id: number;
 	videoId: string;

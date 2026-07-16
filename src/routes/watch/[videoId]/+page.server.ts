@@ -2,7 +2,7 @@ import { error, fail } from '@sveltejs/kit';
 import { eq, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { videos } from '$lib/server/db/schema';
-import { getVideo } from '$lib/server/library';
+import { getVideo, listPlayQueue } from '$lib/server/library';
 import { markWatched, markUnwatched } from '$lib/server/lifecycle';
 import { enqueueDownload } from '$lib/server/downloads';
 import { getSetting } from '$lib/server/settings';
@@ -11,10 +11,14 @@ import { isVideoId } from '$lib/server/slug';
 import { createShare, revokeShare, listSharesForVideo } from '$lib/server/shares';
 import type { PageServerLoad, Actions } from './$types';
 
-export const load: PageServerLoad = ({ params }) => {
+export const load: PageServerLoad = ({ params, url }) => {
 	if (!isVideoId(params.videoId)) error(400, 'Bad video id');
 	const video = getVideo(params.videoId);
 	if (!video) error(404, 'Video not found');
+
+	// Optional play-queue context (?list=wl|all|ch:<id>) for autoplay-next + repeat.
+	const listParam = url.searchParams.get('list');
+	const queue = listParam ? listPlayQueue(listParam) : [];
 
 	const common = {
 		videoId: video.videoId,
@@ -38,6 +42,8 @@ export const load: PageServerLoad = ({ params }) => {
 	}
 	return {
 		playable: true as const,
+		listParam: queue.length ? listParam : null,
+		queue,
 		autoSkipDefault: getSetting('sponsorblockAutoSkip'),
 		historySyncEnabled: config.historySyncEnabled,
 		authEnabled: config.authEnabled,

@@ -148,6 +148,14 @@ Fix drift in one file. Don't spread yt-dlp calls or `ytInitialData` parsing.
 10. **yt-dlp is pinned** in the Dockerfile (`YTDLP_VERSION`). Extractor breakage
     is the #1 failure mode — bump the pin when downloads start failing; the
     Settings page also has a self-update button.
+11. **yt-dlp needs a JS runtime (Deno).** YouTube serves a JS "`n`-parameter"
+    challenge (yt-dlp's *EJS* system). Without a runtime to solve it, yt-dlp gets
+    **only storyboard images** and the download fails with the misleading
+    `Requested format is not available` — even on the latest yt-dlp, so bumping
+    the pin does **nothing**. The Dockerfile bakes in a pinned `deno`
+    (`DENO_VERSION`); yt-dlp auto-detects it on PATH. Symptom to grep for in a
+    failing run: `n challenge solving failed`. Confirm with
+    `yt-dlp --list-formats <url>` inside the container (only `sb*` rows = broken).
 
 ## Deployment (brief)
 

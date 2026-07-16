@@ -35,6 +35,7 @@
 		{#each data.videos as v (v.videoId)}
 			<VideoCard
 				videoId={v.videoId}
+				href={data.search ? undefined : `/watch/${v.videoId}?list=all`}
 				title={v.title}
 				channelName={v.channelName}
 				durationSeconds={v.durationSeconds}

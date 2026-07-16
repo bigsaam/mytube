@@ -54,7 +54,7 @@
 				<span class="cursor-grab px-1 text-fg-faint" title="Drag to reorder">⠿</span>
 				<span class="w-5 text-center text-sm tabular-nums text-fg-faint">{i + 1}</span>
 
-				<a href="/watch/{item.videoId}" class="relative aspect-video w-40 shrink-0 overflow-hidden rounded-lg bg-bg-raised">
+				<a href="/watch/{item.videoId}?list=wl" class="relative aspect-video w-40 shrink-0 overflow-hidden rounded-lg bg-bg-raised">
 					{#if item.status === 'ready' && !item.filesDeleted}
 						<img src="/api/thumb/{item.videoId}" alt="" class="h-full w-full object-cover" />
 					{:else}
@@ -66,7 +66,7 @@
 				</a>
 
 				<div class="min-w-0 flex-1">
-					<a href="/watch/{item.videoId}" class="line-clamp-2 text-sm font-medium hover:text-white">{item.title}</a>
+					<a href="/watch/{item.videoId}?list=wl" class="line-clamp-2 text-sm font-medium hover:text-white">{item.title}</a>
 					<p class="truncate text-xs text-fg-muted">
 						{item.channelName}
 						{#if item.status !== 'ready'}<span class="ml-1 capitalize text-fg-faint">· {item.status}</span>{/if}
