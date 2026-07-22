@@ -12,6 +12,9 @@
 
 	interface Props {
 		videoId: string;
+		/** Shown on the OS lock-screen / notification media controls. */
+		title?: string;
+		channelName?: string | null;
 		durationSeconds?: number | null;
 		hasSubtitles?: boolean;
 		chapters?: Chapter[];
@@ -32,6 +35,8 @@
 	}
 	let {
 		videoId,
+		title,
+		channelName = null,
 		durationSeconds = null,
 		hasSubtitles = false,
 		chapters = [],
@@ -93,6 +98,66 @@
 		// @ts-expect-error — WebKit-only API, not in lib.dom types.
 		video?.webkitShowPlaybackTargetPicker?.();
 	}
+
+	/* ------------------------------------------------- OS media session */
+	// Lock-screen / notification-shade controls + artwork + headset buttons
+	// on iOS and Android. No-op where unsupported (older Safari, etc.).
+	function setupMediaSession() {
+		if (!('mediaSession' in navigator)) return;
+		const ms = navigator.mediaSession;
+		try {
+			ms.metadata = new MediaMetadata({
+				title: title ?? 'MyTube',
+				artist: channelName ?? '',
+				artwork: [
+					{ src: posterUrl, sizes: '512x512', type: 'image/jpeg' },
+					{ src: posterUrl, sizes: '1280x720', type: 'image/jpeg' }
+				]
+			});
+		} catch {
+			/* MediaMetadata construction can throw on odd artwork URLs — ignore. */
+		}
+		const set = (action: MediaSessionAction, handler: MediaSessionActionHandler | null) => {
+			try {
+				ms.setActionHandler(action, handler);
+			} catch {
+				/* Not every UA supports every action (e.g. seekto). */
+			}
+		};
+		set('play', () => video?.play());
+		set('pause', () => video?.pause());
+		set('seekbackward', (d) => seekBy(-(d.seekOffset ?? 10)));
+		set('seekforward', (d) => seekBy(d.seekOffset ?? 10));
+		set('seekto', (d) => {
+			if (d.seekTime == null) return;
+			if (d.fastSeek && video?.fastSeek) video.fastSeek(d.seekTime);
+			else seek(d.seekTime);
+		});
+		// Only expose prev/next when there's actually a queue to move through.
+		set('previoustrack', hasQueue ? () => playPrev() : null);
+		set('nexttrack', hasQueue ? () => playNext() : null);
+	}
+
+	function updatePositionState() {
+		if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState) return;
+		if (!(duration > 0) || !isFinite(duration)) return;
+		try {
+			navigator.mediaSession.setPositionState({
+				duration,
+				playbackRate: rate || 1,
+				position: Math.min(Math.max(currentTime, 0), duration)
+			});
+		} catch {
+			/* Ignore transient invalid-state errors during load. */
+		}
+	}
+
+	// Keep the OS control's play/pause glyph in sync with actual state.
+	$effect(() => {
+		if ('mediaSession' in navigator) {
+			navigator.mediaSession.playbackState = paused ? 'paused' : 'playing';
+		}
+	});
 
 	let streamUrl = $derived(streamSrc ?? `/api/stream/${videoId}`);
 	let posterUrl = $derived(posterSrc ?? `/api/thumb/${videoId}`);
@@ -156,12 +221,25 @@
 		// Safari keeps its inline AirPlay affordance available on the element.
 		video?.setAttribute('x-webkit-airplay', 'allow');
 		video?.addEventListener('webkitplaybacktargetavailabilitychanged', onAirplay);
+		setupMediaSession();
 		return () => {
 			document.removeEventListener('fullscreenchange', onFs);
 			window.removeEventListener('beforeunload', beacon);
 			video?.removeEventListener('webkitplaybacktargetavailabilitychanged', onAirplay);
 			clearInterval(ping);
 			flushProgress();
+			// Release the media-session handlers so the next page starts clean.
+			if ('mediaSession' in navigator) {
+				const ms = navigator.mediaSession;
+				for (const a of ['play', 'pause', 'seekbackward', 'seekforward', 'seekto', 'previoustrack', 'nexttrack'] as const) {
+					try {
+						ms.setActionHandler(a, null);
+					} catch {
+						/* ignore */
+					}
+				}
+				ms.metadata = null;
+			}
 		};
 	});
 
@@ -173,6 +251,7 @@
 			video.currentTime = positionSeconds;
 		}
 		applyTextTrack();
+		updatePositionState();
 	}
 
 	/* ----------------------------------------------------- progress sync */
@@ -196,6 +275,7 @@
 		if (!video) return;
 		currentTime = video.currentTime;
 		if (video.buffered.length) buffered = video.buffered.end(video.buffered.length - 1);
+		updatePositionState();
 		if (autoSkip) {
 			const seg = sponsorblock.find((s) => currentTime >= s.start && currentTime < s.end - 0.3);
 			if (seg && seg.end < duration - 0.5) {
@@ -252,6 +332,46 @@
 		const tracks = video?.textTracks;
 		if (!tracks) return;
 		for (let i = 0; i < tracks.length; i++) tracks[i].mode = subsOn ? 'showing' : 'hidden';
+	}
+
+	/* ----------------------------------------------- touch gestures */
+	// Double-tap the left/right third to seek ∓10s (like the YouTube app),
+	// the middle to toggle fullscreen; a single tap shows/hides the controls.
+	// We handle touch explicitly and preventDefault so the synthesized mouse
+	// click (which would toggle play) doesn't also fire.
+	let lastTouchAt = 0;
+	let tapTimer: ReturnType<typeof setTimeout> | undefined;
+	function onVideoTouchEnd(e: TouchEvent) {
+		if (!video) return;
+		const touch = e.changedTouches[0];
+		if (!touch) return;
+		e.preventDefault();
+		const rect = video.getBoundingClientRect();
+		const x = touch.clientX - rect.left;
+		const w = rect.width;
+		const now = e.timeStamp;
+		if (now - lastTouchAt < 300) {
+			// Double tap.
+			clearTimeout(tapTimer);
+			lastTouchAt = 0;
+			if (x < w * 0.35) {
+				seekBy(-10);
+				toast('« 10s');
+			} else if (x > w * 0.65) {
+				seekBy(10);
+				toast('10s »');
+			} else {
+				toggleFullscreen();
+			}
+			return;
+		}
+		lastTouchAt = now;
+		// Defer the single-tap action so a second tap can upgrade it to a seek.
+		clearTimeout(tapTimer);
+		tapTimer = setTimeout(() => {
+			if (controlsVisible && !paused) controlsVisible = false;
+			else nudgeControls();
+		}, 280);
 	}
 
 	/* --------------------------------------------------------- seekbar */
@@ -352,6 +472,7 @@
 	<video
 		bind:this={video}
 		class="aspect-video w-full bg-black"
+		style="touch-action: manipulation"
 		src={streamUrl}
 		poster={posterUrl}
 		autoplay
@@ -364,6 +485,7 @@
 		onended={onEnded}
 		onclick={togglePlay}
 		ondblclick={toggleFullscreen}
+		ontouchend={onVideoTouchEnd}
 	>
 		{#if hasSubtitles}
 			<track kind="subtitles" src={subsUrl} srclang="en" label="English" />
@@ -447,7 +569,7 @@
 			</button>
 			<input
 				type="range" min="0" max="1" step="0.05" bind:value={volume}
-				class="h-1 w-20 cursor-pointer accent-accent" aria-label="Volume"
+				class="hidden h-1 w-20 cursor-pointer accent-accent sm:block" aria-label="Volume"
 			/>
 
 			<span class="ml-1 text-xs tabular-nums text-white/90">

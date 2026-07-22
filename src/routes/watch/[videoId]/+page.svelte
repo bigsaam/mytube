@@ -60,6 +60,8 @@
 			bind:this={player}
 			bind:theater
 			videoId={data.video.videoId}
+			title={data.video.title}
+			channelName={data.video.channelName}
 			durationSeconds={data.video.durationSeconds}
 			hasSubtitles={data.video.hasSubtitles}
 			chapters={data.video.chapters}

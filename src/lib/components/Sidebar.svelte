@@ -5,8 +5,11 @@
 	interface Props {
 		counts?: { feed: number; discover: number; watchLater: number; downloads: number };
 		showLogout?: boolean;
+		/** Whether the mobile drawer is open. Ignored at md+ where the sidebar is static. */
+		open?: boolean;
+		onNavigate?: () => void;
 	}
-	let { counts, showLogout = false }: Props = $props();
+	let { counts, showLogout = false, open = false, onNavigate }: Props = $props();
 
 	let nav = $derived([
 		{ href: '/feed', label: 'Feed', icon: 'feed', badge: counts?.feed },
@@ -24,8 +27,12 @@
 	}
 </script>
 
-<aside class="flex h-full w-56 shrink-0 flex-col border-r border-line bg-bg px-3 py-4">
-	<a href="/feed" class="mb-6 flex items-center gap-2 px-2">
+<aside
+	class="fixed inset-y-0 left-0 z-40 flex h-full w-64 shrink-0 flex-col border-r border-line bg-bg px-3 py-4
+		transition-transform duration-200 md:relative md:z-auto md:w-56 md:translate-x-0
+		{open ? 'translate-x-0' : '-translate-x-full'}"
+>
+	<a href="/feed" onclick={onNavigate} class="mb-6 flex items-center gap-2 px-2">
 		<div class="grid h-8 w-8 place-items-center rounded-lg bg-accent text-bg">
 			<Icon name="play" size={18} />
 		</div>
@@ -36,7 +43,8 @@
 		{#each nav as item (item.href)}
 			<a
 				href={item.href}
-				class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors
+				onclick={onNavigate}
+				class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors
 					{active(item.href) ? 'bg-bg-raised font-medium text-fg' : 'text-fg-muted hover:bg-bg-soft hover:text-fg'}"
 			>
 				<Icon name={item.icon} size={18} />

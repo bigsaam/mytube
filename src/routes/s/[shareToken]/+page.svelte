@@ -45,6 +45,8 @@
 				posterSrc={`/s/${data.shareToken}/thumb`}
 				subsSrc={`/s/${data.shareToken}/subs`}
 				videoId={data.video.videoId}
+				title={data.video.title}
+				channelName={data.video.channelName}
 				durationSeconds={data.video.durationSeconds}
 				hasSubtitles={data.video.hasSubtitles}
 				chapters={data.video.chapters}
