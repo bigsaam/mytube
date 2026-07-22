@@ -202,8 +202,18 @@
 
 	/* ---------------------------------------------------------- lifecycle */
 	onMount(() => {
-		const onFs = () => (fullscreen = document.fullscreenElement === container);
+		const onFs = () => {
+			const wk = (document as unknown as { webkitFullscreenElement?: Element })
+				.webkitFullscreenElement;
+			fullscreen = (document.fullscreenElement ?? wk) === container;
+		};
 		document.addEventListener('fullscreenchange', onFs);
+		document.addEventListener('webkitfullscreenchange', onFs);
+		// iPhone native video fullscreen fires these on the <video> element.
+		const onVideoFsBegin = () => (fullscreen = true);
+		const onVideoFsEnd = () => (fullscreen = false);
+		video?.addEventListener('webkitbeginfullscreen', onVideoFsBegin);
+		video?.addEventListener('webkitendfullscreen', onVideoFsEnd);
 		const beacon = () => flushProgress(true);
 		document.addEventListener('visibilitychange', () => {
 			if (document.hidden) flushProgress();
@@ -224,6 +234,9 @@
 		setupMediaSession();
 		return () => {
 			document.removeEventListener('fullscreenchange', onFs);
+			document.removeEventListener('webkitfullscreenchange', onFs);
+			video?.removeEventListener('webkitbeginfullscreen', onVideoFsBegin);
+			video?.removeEventListener('webkitendfullscreen', onVideoFsEnd);
 			window.removeEventListener('beforeunload', beacon);
 			video?.removeEventListener('webkitplaybacktargetavailabilitychanged', onAirplay);
 			clearInterval(ping);
@@ -321,8 +334,27 @@
 	}
 	function toggleFullscreen() {
 		if (!container) return;
-		if (document.fullscreenElement) document.exitFullscreen();
-		else container.requestFullscreen?.();
+		const doc = document as unknown as {
+			webkitFullscreenElement?: Element;
+			webkitExitFullscreen?: () => void;
+		};
+		const el = container as unknown as { webkitRequestFullscreen?: () => void };
+		// iPhone Safari: the standard `webkitEnterFullscreen` lives on the <video>,
+		// not the container, and there's no div-level fullscreen at all.
+		const v = video as unknown as { webkitEnterFullscreen?: () => void };
+
+		if (document.fullscreenElement || doc.webkitFullscreenElement) {
+			(document.exitFullscreen ?? doc.webkitExitFullscreen)?.call(document);
+			return;
+		}
+		if (container.requestFullscreen) {
+			container.requestFullscreen();
+		} else if (el.webkitRequestFullscreen) {
+			el.webkitRequestFullscreen();
+		} else if (v.webkitEnterFullscreen) {
+			// iPhone: hands off to the native video player (its own controls).
+			v.webkitEnterFullscreen();
+		}
 	}
 	function toggleSubs() {
 		subsOn = !subsOn;
