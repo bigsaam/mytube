@@ -19,6 +19,16 @@
 		plus: 'M12 5v14M5 12h14',
 		menu: 'M4 6h16M4 12h16M4 18h16',
 		play: 'M8 5v14l11-7z',
+		pause: 'M8 5h3v14H8zM13 5h3v14h-3z',
+		prev: 'M7 5v14M20 5l-11 7 11 7z',
+		next: 'M17 5v14M4 5l11 7-11 7z',
+		volume: 'M4 9v6h4l5 4V5L8 9H4M16 9.5a3 3 0 010 5M18.5 7a6.5 6.5 0 010 10',
+		'volume-mute': 'M4 9v6h4l5 4V5L8 9H4M22 9.5l-5 5M17 9.5l5 5',
+		repeat: 'M4 12V9a3 3 0 013-3h11m-2-3l3 3-3 3M20 12v3a3 3 0 01-3 3H6m2 3l-3-3 3-3',
+		airplay: 'M6 17H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-1M12 15l4 5H8z',
+		theater: 'M4 7h16a1 1 0 011 1v8a1 1 0 01-1 1H4a1 1 0 01-1-1V8a1 1 0 011-1z',
+		fullscreen: 'M4 9V5a1 1 0 011-1h4M20 9V5a1 1 0 00-1-1h-4M4 15v4a1 1 0 001 1h4M20 15v4a1 1 0 01-1 1h-4',
+		'fullscreen-exit': 'M9 4v4a1 1 0 01-1 1H4M15 4v4a1 1 0 001 1h4M9 20v-4a1 1 0 00-1-1H4M15 20v-4a1 1 0 011-1h4',
 		check: 'M5 13l4 4L19 7',
 		x: 'M6 6l12 12M18 6L6 18',
 		clock: 'M12 7v5l3 2M12 3a9 9 0 100 18 9 9 0 000-18z',
@@ -41,7 +51,7 @@
 	width={size}
 	height={size}
 	viewBox="0 0 24 24"
-	fill={name === 'play' ? 'currentColor' : 'none'}
+	fill={name === 'play' || name === 'pause' ? 'currentColor' : 'none'}
 	stroke="currentColor"
 	stroke-width="1.8"
 	stroke-linecap="round"

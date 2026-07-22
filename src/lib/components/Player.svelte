@@ -585,19 +585,23 @@
 		<!-- Buttons -->
 		<div class="flex items-center gap-3 text-white">
 			{#if hasQueue}
-				<button onclick={playPrev} aria-label="Previous" title="Previous" class="text-sm hover:text-accent">⏮</button>
+				<button onclick={playPrev} aria-label="Previous" title="Previous" class="hover:text-accent">
+					<Icon name="prev" size={20} />
+				</button>
 			{/if}
 
 			<button onclick={togglePlay} aria-label={paused ? 'Play' : 'Pause'} class="hover:text-accent">
-				{#if paused}<Icon name="play" size={22} />{:else}<span class="text-lg leading-none">❚❚</span>{/if}
+				<Icon name={paused ? 'play' : 'pause'} size={22} />
 			</button>
 
 			{#if hasQueue}
-				<button onclick={playNext} aria-label="Next" title="Next" class="text-sm hover:text-accent">⏭</button>
+				<button onclick={playNext} aria-label="Next" title="Next" class="hover:text-accent">
+					<Icon name="next" size={20} />
+				</button>
 			{/if}
 
 			<button onclick={toggleMute} aria-label="Mute" class="hover:text-accent">
-				<span class="text-sm">{muted || volume === 0 ? '🔇' : '🔊'}</span>
+				<Icon name={muted || volume === 0 ? 'volume-mute' : 'volume'} size={20} />
 			</button>
 			<input
 				type="range" min="0" max="1" step="0.05" bind:value={volume}
@@ -647,21 +651,26 @@
 				{#if !share}
 					<button
 						onclick={() => (repeat = !repeat)}
-						class="text-sm {repeat ? 'text-accent' : 'text-white/70 hover:text-white'}"
+						class="{repeat ? 'text-accent' : 'text-white/70 hover:text-white'}"
 						title={hasQueue ? 'Repeat queue' : 'Repeat'}
 						aria-label="Repeat"
-					>🔁</button>
+					>
+						<Icon name="repeat" size={18} />
+					</button>
 				{/if}
 
 				{#if airplayAvailable}
-					<button onclick={showAirPlayPicker} class="text-sm hover:text-accent" title="AirPlay" aria-label="AirPlay">📺</button>
+					<button onclick={showAirPlayPicker} class="hover:text-accent" title="AirPlay" aria-label="AirPlay">
+						<Icon name="airplay" size={18} />
+					</button>
 				{/if}
 
-				<button onclick={() => (theater = !theater)} class="hover:text-accent" title="Theater mode (t)" aria-label="Theater mode">
-					<span class="text-sm">▭</span>
+				<!-- Theater mode is a desktop layout affordance; hide it on phones. -->
+				<button onclick={() => (theater = !theater)} class="hidden hover:text-accent sm:block" title="Theater mode (t)" aria-label="Theater mode">
+					<Icon name="theater" size={18} />
 				</button>
 				<button onclick={toggleFullscreen} class="hover:text-accent" title="Fullscreen (f)" aria-label="Fullscreen">
-					<span class="text-sm">{fullscreen ? '🡼' : '⛶'}</span>
+					<Icon name={fullscreen ? 'fullscreen-exit' : 'fullscreen'} size={18} />
 				</button>
 			</div>
 		</div>
